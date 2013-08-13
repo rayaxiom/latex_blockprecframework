@@ -1,0 +1,9 @@
+* In the case of attaching a face element which requires the bulk dof types to be classified differently, it can be done either by the bulk element, or by the  face element. [describe how the bulk classification works, including the return of the ndof_types()]. State that the bulk element classification approach does not work when a boundary has two different type of face elements on it. What will it classify the bulk DOF as? surface 1 or surface mesh 2? Can alliviate this by having the surface mesh RE-CLASSIFY the bulk DOFs. Do I need to include pictures like the prescribed lagrange tutorial?
+
+* Under-the-hood, describe how the dof_to_dof_map is handled (gets converted to other dof to block map within the preconditioner's block setup, and how the dof_to_block_map passed to the block_setup function is not ignored, but the identity is still used. Compare this with the case where no precomputed blocks are used.)
+
+* Under the hood: Talk about how get_block and get_block_vector works, in the case where there are no precomputed preconditioner blocks, the case there is, and the related functions (i.e. we store the precomputed block distributions, etc...)
+
+
+
+
