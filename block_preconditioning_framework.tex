@@ -1,49 +1,65 @@
-In this document we discuss \verb+oomph-lib+'s block preconditioning
-framework. We describe the functionality of the framework by starting with 
-discussing the implementation of a simple block diagonal preconditioner, the 
-LSC preconditioner, and finally a preconditioner for the 
-solution of the constrained Navier-Stokes equations with Lagrange multipliers.
+In this document we review the features of \verb+oomph-lib+'s block 
+preconditioning framework. We describe the functionality of the 
+framework starting from the implementation of a simple block diagonal 
+preconditioner. Then we introduce the LSC (Least Square Commutator) 
+preconditioner for the Navier-Stokes equations~\cite{fastiterativesolvers}. 
+Finally, we discuss the implementation of the augmented Lagrangian 
+preconditioner for the solution of the constrained Navier-Stokes equations with
+Lagrange multipliers.
 
-The aim of the block preconditioning framework is to provide a simple 
-environment to facilitate the implementation of distributed block 
-preconditioners which in particular allows existing (block) preconditioners to 
-be reused to create in hierarchical fashion new block preconditioners for 
-multi-physics problems. For example, in the Lagrangian preconditioner 
-(considered in this document) we reuse the existing LSC preconditioner 
-for the subsidiary problems.
+the purpose of the block preconditioning framework (BPF) is to facilitate 
+efficient implementation of the block preconditioners in a distributed 
+environment. As such, it represents a software middleware which enables 
+sytematic hierachical construction of block preconditioners for arbitrarily 
+complex multiphysics problems by reusing the existing efficient preconditioners
+for the constituent single physics sub-problems. At the same time the BPF hides
+from the end user tedious implementation details associated with blocking of 
+the Jacobian and the distribution of these blocks among the processors (these 
+procedures involve the intricate communication with other parts of the library 
+to obtain the necessary information). The operations performed by the BPF add 
+only a minor computational overhead to the total solution time thus retaining 
+asymptotically the same performance as the constituent scalar problem solvers 
+(such as AMG). (CITE RICHARD THESIS AND PAGE NUMBER)
 
 \section{ Theoretical Background\label{sec:theoretical_background}}
-In \verb+oomph-lib+, all problems are solved by Newton's method,
-which requires the repeated solution of linear systems of the form
+In \verb+oomph-lib+, all problems are solved by Newton's method, which requires
+the (if the problem is not linear, repeated) solution of linear systems of the 
+form
 
-\begin{equation*}
+\begin{equation}
 J\;\mathbf{\delta x} = -\mathbf{r}
-\end{equation*}
+\label{eq:linear_system1}
+\end{equation}
 for the Newton correction $\mathbf{\delta x}$ where $J$ is the
-Jacobian matrix and $\mathbf{r}$ is the vector of residuals. (Left) 
-preconditioning represents a transformation of the original linear system to
+Jacobian matrix and $\mathbf{r}$ is the vector of non-linear residuals. (Left) 
+preconditioning represents a transformation of the original linear system 
+\eqref{eq:linear_system1} to
 \begin{equation*}
 P^{-1}J\;\mathbf{ \delta x}=-P^{-1}\mathbf{r}
 \end{equation*}
 is introduced with the aim of accelerating the convergence of Krylov subspace 
-iterative methods such as GMRES or CG. The application of the preconditioner 
-requires the solution of
+iterative methods such as GMRES or CG (CITE saad). The application of the 
+preconditioner requires the solution of a linear system
 \begin{equation*}
 P\mathbf{z}=\mathbf{y}
 \end{equation*}
-
 for $\mathbf{z}$ at each Krylov iteration.
 
 Block preconditioning requires special enumeration schemes for the unknowns 
 (equivalent to reordering the linear systems) where all the unknowns 
 corresponding to each type of DOF are grouped together and enumerated 
 consecutively. This leads to a natural block structure of the linear systems.
+This process is equivalent to the following transformation
+\begin{equation*}
+  \underbrace{P_{\pi} A P_{\sigma}}_{\tilde{A}} \underbrace{P_{\sigma}^{\mathsf{T}}\mathbf{x}}_{\tilde{\mathbf{x}}}=\underbrace{P_{\pi}\mathbf{f}}_{\tilde{\mathbf{f}}}
+\end{equation*}
+where $P_{\pi}$ and $P_{\sigma}$ are the permutation matrices.
 
 For instance, linear elasticity problems[CITE] involve the solid (the nodal positions in the solid domain) degrees of freedom (DOFs). Consider the two-dimensional case, we begin by reordering the linear system to group together the two types of DOF 
 \begin{equation*}
 \begin{bmatrix}
- S_{xx} & S_{xy} \\
- S_{yx} & S_{yy}
+ J_{xx} & J_{xy} \\
+ J_{yx} & J_{yy}
 \end{bmatrix}
 \begin{bmatrix}
  \mathbf{\delta x_x} \\
@@ -55,21 +71,21 @@ For instance, linear elasticity problems[CITE] involve the solid (the nodal posi
  \mathbf{r_y}
 \end{bmatrix},
 \end{equation*}
-then the block diagonal preconditiner of the form 
+then the block diagonal preconditioner of the form 
 \begin{equation*}
 P_{diag}=
 \begin{bmatrix}
-S_{xx}&     \\
-      &S_{yy}
+J_{xx}&     \\
+      &J_{yy}
 \end{bmatrix}
 \end{equation*}
-is obtained by omitting the off-diagonal blocks from the Jacobian.
-
-The application of the preconditioner requires the solution of the linear system
+is obtained by omitting the off-diagonal blocks from the Jacobian [CITE].
+The application of the preconditioner requires the exact or approximate 
+solution of the linear system
 \begin{equation*}
 \begin{bmatrix}
-S_{xx}& \\
-      &S_{yy}
+J_{xx}& \\
+      &J_{yy}
 \end{bmatrix}
 \begin{bmatrix}
 \mathbf{z_x}\\
@@ -81,7 +97,8 @@ S_{xx}& \\
 \mathbf{y_y}
 \end{bmatrix},
 \end{equation*}
-the two sub-blocks will be solved directly.
+the two sub-blocks will be solved directly. The vector $\mathbf{y}$ is the 
+linear residual at the current GMRES iteration.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% FRAMEWORK OVERVIEW
@@ -98,23 +115,36 @@ within \verb+oomph-lib+'s block preconditioning framework.
 
 %%%% BLOCK PRECONDITIONABLE ELEMENTS
 \subsection{Block Preconditionable Elements\label{sec:block_preconditionable_elements}}
-The classification of DOFs is implemented at an elemental level. The class \verb+GeneralisedElement+ contains two broken virtual functions that must be re-implemented to label the DOFs with their type. The functions are:
-
+The DOFs need to be classified into different types so that the BPF knows how
+to group the DOFs which it then assemble into sub-matrices for the 
+preconditioner blocks. The classification of DOFs is implemented at an 
+elemental level. The class \verb+GeneralisedElement+ contains two broken 
+virtual functions that must be re-implemented to label the DOFs with their 
+type. The functions are:
 \begin{itemize}
-\item \verb+GeneralisedElement::ndof_types()+ must return the number of DOF types associated with an element.
-\item \verb+GeneralisedElement::get_dof_numbers_for_unknowns(...)+ must return a list of pairs comprising a map from global equation number to DOF type for all unknowns in the element.
+\item \verb+GeneralisedElement::ndof_types()+ must return the number of DOF 
+types associated with an element.
+\item \verb+GeneralisedElement::get_dof_numbers_for_unknowns(...)+ must return 
+a list of pairs comprising a map from global equation number to DOF type for 
+all unknowns in the element.
 \end{itemize}
-These are already implemented for many elements. For instance the two-dimensional FSI channel with leaflet problem has two types of element:
+These are already implemented for many element types. For instance the 
+two-dimensional FSI channel with leaflet problem has two types of element:
 \begin{itemize}
-\item \verb+RefineableQTaylorHoodElement<2>+ are the fluid elements. They have three types of DOF; $x$-velocity DOFs are labelled \verb+0+, $y$-velocity DOFs are labelled \verb+1+ and the pressure DOFs are labelled \verb+2+.
+\item \verb+RefineableQTaylorHoodElement<2>+ are the fluid elements. They have
+three types of DOF; $x$-velocity DOFs are labelled \verb+0+, $y$-velocity DOFs
+are labelled \verb+1+ and the pressure DOFs are labelled \verb+2+.
 \item \verb+FSIHermiteBeamElement+ are the wall elements and have one type of
   DOF (the nodal position) labelled \verb+0+.
 \end{itemize}
-The linear elasticity elements \verb+MyLinearElasticityElement<DIM>+ are made block-preconditionable with a wrapper
-around the element implemented in the driver code:
+The linear elasticity elements \verb+MyLinearElasticityElement<DIM>+ are made 
+block-preconditionable with a wrapper around the element implemented in the 
+driver code:
 \lstset{numberfirstline=true,numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
 \lstinputlisting[firstnumber=64,firstline=64, lastline=118]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
-Thus, in the \verb+MyLinearElasticityElement<2>+ we have two types of DOF; corresponding to the $x$ and $y$ nodal displacements. They are classified as DOF types \verb+0+ and \verb+1+ respectively.
+Thus, in the \verb+MyLinearElasticityElement<2>+ we have two types of DOF; 
+corresponding to the $x$ and $y$ nodal displacements. They are classified as 
+DOF types \verb+0+ and \verb+1+ respectively.
 
 %%%% DOF TYPES AND BLOCK TYPES
 \subsection{DOF types and block types\label{sec:dof_types_and_block_types}}
@@ -122,7 +152,7 @@ In the block diagonal preconditioner for the two-dimensional linear elasticity p
 \begin{itemize}
 \item \textbf{Elemental DOF type classification}: Each element classifies it's own DOF type in the function \verb+get_dof_numbers_for_unknowns(...)+. In the case of \verb+MyLinearElasticityElement<2>+ elements, the DOF types are classified as \verb+0+ and \verb+1+. For \verb+QTaylorHoodElement<2>+ elements, the DOF types are classified as \verb+0+ and \verb+1+ for the $x$ and $y$-velocities, and \verb+2+ for the pressure $p$. 
 
-\item \textbf{Role of meshes}: Within the block preconditioning framework, each mesh acts as a container for a set of DOF type classifications. All elements in the same mesh MUST return the same \verb+ndof_types()+ value. If two different element types are in the same mesh, and their \verb+ndof_types()+ does indeed return the same number, then their elementtal DOF type classifcations will be treated as the same type. For example, the \verb+QTaylorHoodElement<2>+ classifies the DOF types as follows:
+\item \textbf{The role of meshes}: Within the block preconditioning framework, each mesh acts as a container for a set of DOF type classifications. All elements in the same mesh MUST return the same \verb+ndof_types()+ value. If two different element types are in the same mesh, and their \verb+ndof_types()+ does indeed return the same number, then their elementtal DOF type classifcations will be treated as the same type. For example, the \verb+QTaylorHoodElement<2>+ classifies the DOF types as follows:
 \begin{itemize}
  \item \verb+0+ $x$-velocity
  \item \verb+1+ $y$-velocity

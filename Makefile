@@ -2,6 +2,7 @@ all: pdf
 FILENAME = report
 pdf: $(FILENAME).tex 
 	pdflatex $(FILENAME)
+	bibtex $(FILENAME)
 	pdflatex $(FILENAME)
 	pdflatex $(FILENAME)
 
