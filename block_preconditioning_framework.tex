@@ -263,7 +263,8 @@ in the case of the
 since the LSC preconditioner know where the Navier-Stokes mesh need to be in 
 the order of the meshes. We refer the ordering of the preconditioner DOF types, 
 determined by the elemental DOF type and the ordering of the meshes, the 
-\emph{natural ordering} of the preconditioner DOF types. For the above example, the natural ordering of the preconditioner DOF
+\emph{natural ordering} of the preconditioner DOF types. For the above example, 
+the natural ordering of the preconditioner DOF
 types would be:
 \begin{itemize}
  \item \verb+0+ $x$-velocity
@@ -273,28 +274,69 @@ types would be:
  \item \verb+4+ constrained $y$-velocity
  \item \verb+5+ $L$-Lagrange multiplier
 \end{itemize}
-
-Note: Each DOF can be classified more than once. If this is the case, then the classification will be the last mesh visited by the block preconditioning framework. This should not be an issue if you do not have discontinuous boundary conditions.
+Note: Each DOF can be classified more than once. If this is the case, then the 
+classification will be the last mesh visited by the block preconditioning 
+framework. This should not be an issue if you do not have discontinuous 
+boundary conditions.
 
 \subsubsection{Block types}
-The block types are the blocks of sub-matrices the block preconditioner works with. Block types may contain more than one preconditioner DOF types or be as fine grain as the number of preconditioner DOF types. Note: There can not be more block types than there are preconditioner DOF types. For example, in case of the the LSC preconditioner (in 2D) we have three DOF types ($x$ , $y$-velocities, and pressure), but the preconditioner only distinguishes between velocity and pressure DOF types, thus we have two block types (velocity block and pressure block). The setup of the block types are handled by the function... \verb+block_setup(...)+. The setup of the blocks and DOF types will be discussed in more detail later on.
+The block types are the blocks of sub-matrices the block preconditioner works 
+with. Block types may contain more than one preconditioner DOF types or be as 
+fine grain as the number of preconditioner DOF types. Note: There can not be 
+more block types than there are preconditioner DOF types. For example, in case 
+of the LSC preconditioner (in 2D) we have three DOF types ($x$ , $y$-velocities, 
+and pressure), but the preconditioner only distinguishes between velocity and 
+pressure DOF types, thus we have two block types (velocity block and pressure 
+block). The setup of the block types are handled by the function 
+\verb+block_setup(...)+. The setup of the blocks and DOF types will be 
+discussed in more detail later on.
 
 
 %%%% MASTER AND SUBSIDIARY PRECONDITIONER
 \subsection{Master and Subsidiary Preconditioners\label{sec:master_and_subsidiary_preconditioners}}
 Consider the again the LSC Navier-Stokes preconditioner.
-If we decide to approximate the $\mathbf{F}$ block (the momentum block) by it's diagonal blocks, we can pass the block diagonal preconditioner (discussed in (Distributed) General-Purpose Block Preconditioners) to the LSC preconditioner to use as a subsidiary preconditioner via the function \verb+set_f_preconditioner(...)+. We can do the same with the pressure system with the function \verb+set_p_preconditioner(...)+. We refer to these preconditioners as subsidiary preconditioners. \verb+Oomph-lib+'s block preconditioning framework facilitates the the reuse of existing preconditioners as subsidiary preconditioners.
+If we decide to approximate the $\mathbf{F}$ block (the momentum block) by it's 
+diagonal blocks, we can pass the block diagonal preconditioner (discussed in 
+(Distributed) General-Purpose Block Preconditioners) to the LSC preconditioner 
+to use as a subsidiary preconditioner via the function 
+\verb+set_f_preconditioner(...)+. We can do the same with the pressure system 
+with the function \verb+set_p_preconditioner(...)+. We refer to these 
+preconditioners as subsidiary preconditioners. \verb+Oomph-lib+'s block 
+preconditioning framework facilitates the the reuse of existing 
+preconditioners as subsidiary preconditioners.
 
-It is important to note that we do not need to consider the \verb+block structure+ of subsidiary block preconditioners when developing master preconditioners. However, the master preconditioner must be aware of the preconditioner DOF type ordering of the subsidiary preconditioner. For example, if the LSC preconditioner is a subsidiary preconditioner (as is the case of the FSI preconditioner), the FSI preconditioner must ensure that the last DOF type given to the LSC preconditioner is the pressure DOF type, and the ones before that are the velocity DOF types.
+It is important to note that we do not need to consider the 
+\verb+block structure+ of subsidiary block preconditioners when developing 
+master preconditioners. However, the master preconditioner must be aware of the 
+preconditioner DOF type ordering of the subsidiary preconditioner. For example, 
+if the LSC preconditioner is a subsidiary preconditioner (as is the case of the 
+FSI preconditioner), the FSI preconditioner must ensure that the last DOF type 
+given to the LSC preconditioner is the pressure DOF type, and the ones before 
+that are the velocity DOF types.
 
-There is only one `true' master preconditioner, the rest are all subsidiary preconditioners, each subsidiary preconditioner holds a pointer to the preconditioner one level up in the hierarchy. Say, there are three preconditioners, $P1$, $P2$ and $P3$. If we use $P2$ to solve a subsidiary system in $P1$, and $P3$ to solve a subsidiary system in $P2$, then it could be said that $P1$ is the master preconditioner for $P2$, and $P2$ is a master preconditioner for $P3$. However, because $P2$'s \verb+Master_block_preconditioner_pointer_pt+ is not null, it is automatically classed as a subsidiary preconditioner. Only the true master preconditioner (so that the \verb+Master_block_preconditioner_pt+ is null) holds all the information about the DOF types and look-up schemes. If a subsidiary preconditioner requires information held only by the master preconditioner, it will go to it's `master' preconditioner. If this `master' preconditioner is a subsidiary preconditioner, it will again go up the hierarchy to it's master preconditioner.
+There is only one `true' master preconditioner, the rest are all subsidiary 
+preconditioners, each subsidiary preconditioner holds a pointer to the 
+preconditioner one level up in the hierarchy. Say, there are three 
+preconditioners, $P1$, $P2$ and $P3$. If we use $P2$ to solve a subsidiary 
+system in $P1$, and $P3$ to solve a subsidiary system in $P2$, then it could be 
+said that $P1$ is the master preconditioner for $P2$, and $P2$ is a master 
+preconditioner for $P3$. However, because $P2$'s 
+\verb+Master_block_preconditioner_pointer_pt+ is not null, it is automatically 
+classed as a subsidiary preconditioner. Only the true master preconditioner (so 
+that the \verb+Master_block_preconditioner_pt+ is null) holds all the information
+about the DOF types and look-up schemes. If a subsidiary preconditioner requires 
+information held only by the master preconditioner, it will go to it's `master'
+preconditioner. If this `master' preconditioner is a subsidiary preconditioner, 
+it will again go up the hierarchy to it's master preconditioner.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% USING THE SIMPLE DIAGONAL BLOCK PRECONDITIONER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Using the Simple Block Preconditioner\label{sec:using_the_simple_block_preconditioner}}
 
-We begin our discussion of the implementation details by demonstrating how to use the preconditioner (implemented in the class \verb+SimpleBlockDiagonalPreconditioner+) in an actual driver code 
+We begin our discussion of the implementation details by demonstrating how to 
+use the preconditioner (implemented in the class 
+\verb+SimpleBlockDiagonalPreconditioner+) in an actual driver code 
 
 (\verb+two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc+).
 
