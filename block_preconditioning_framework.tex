@@ -1,4 +1,4 @@
-In this document we review the features of \verb+oomph-lib+'s block 
+In this document we review the features of \texttt{oomph-lib}'s block 
 preconditioning framework. We describe the functionality of the 
 framework starting from the implementation of a simple block diagonal 
 preconditioner. Then we introduce the LSC (Least Square Commutator) 
@@ -22,7 +22,7 @@ asymptotically the same performance as the constituent scalar problem solvers
 (such as AMG). (CITE RICHARD THESIS AND PAGE NUMBER)
 
 \section{ Theoretical Background\label{sec:theoretical_background}}
-In \verb+oomph-lib+, all problems are solved by Newton's method, which requires
+In \texttt{oomph-lib}, all problems are solved by Newton's method, which requires
 the (if the problem is not linear, repeated) solution of linear systems of the 
 form
 
@@ -111,64 +111,160 @@ require several generic steps:
 \item The application of subsidiary preconditioning operators.
 \end{itemize}
 The following subsections describe how these tasks are performed
-within \verb+oomph-lib+'s block preconditioning framework.
+within \texttt{oomph-lib}'s block preconditioning framework.
 
 %%%% BLOCK PRECONDITIONABLE ELEMENTS
 \subsection{Block Preconditionable Elements\label{sec:block_preconditionable_elements}}
 The DOFs need to be classified into different types so that the BPF knows how
 to group the DOFs which it then assemble into sub-matrices for the 
 preconditioner blocks. The classification of DOFs is implemented at an 
-elemental level. The class \verb+GeneralisedElement+ contains two broken 
+elemental level. The class \texttt{GeneralisedElement} contains two broken 
 virtual functions that must be re-implemented to label the DOFs with their 
 type. The functions are:
 \begin{itemize}
-\item \verb+GeneralisedElement::ndof_types()+ must return the number of DOF 
+\item \texttt{GeneralisedElement::ndof\_types()} must return the number of DOF 
 types associated with an element.
-\item \verb+GeneralisedElement::get_dof_numbers_for_unknowns(...)+ must return 
-a list of pairs comprising a map from global equation number to DOF type for 
-all unknowns in the element.
+\item \texttt{GeneralisedElement::get\_dof\_numbers\_for\_unknowns(...)} 
+must return a list of pairs comprising a map from global equation number to DOF
+type for all unknowns in the element.
 \end{itemize}
 These are already implemented for many element types. For instance the 
 two-dimensional FSI channel with leaflet problem has two types of element:
 \begin{itemize}
-\item \verb+RefineableQTaylorHoodElement<2>+ are the fluid elements. They have
-three types of DOF; $x$-velocity DOFs are labelled \verb+0+, $y$-velocity DOFs
-are labelled \verb+1+ and the pressure DOFs are labelled \verb+2+.
-\item \verb+FSIHermiteBeamElement+ are the wall elements and have one type of
-  DOF (the nodal position) labelled \verb+0+.
+\item \texttt{RefineableQTaylorHoodElement<2>} are the fluid elements. They have
+three types of DOF; $x$-velocity DOFs are labelled \texttt{0}, $y$-velocity DOFs
+are labelled \texttt{1} and the pressure DOFs are labelled \texttt{2}.
+\item \texttt{FSIHermiteBeamElement} are the wall elements and have one type of
+  DOF (the nodal position) labelled \texttt{0}.
 \end{itemize}
-The linear elasticity elements \verb+MyLinearElasticityElement<DIM>+ are made 
+The linear elasticity elements \texttt{MyLinearElasticityElement<DIM>} are made 
 block-preconditionable with a wrapper around the element implemented in the 
 driver code:
 \lstset{numberfirstline=true,numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
 \lstinputlisting[firstnumber=64,firstline=64, lastline=118]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
-Thus, in the \verb+MyLinearElasticityElement<2>+ we have two types of DOF; 
+Thus, in the \texttt{MyLinearElasticityElement<2>} we have two types of DOF; 
 corresponding to the $x$ and $y$ nodal displacements. They are classified as 
-DOF types \verb+0+ and \verb+1+ respectively.
+DOF types \texttt{0} and \texttt{1} respectively.
 
 %%%% DOF TYPES AND BLOCK TYPES
 \subsection{DOF types and block types\label{sec:dof_types_and_block_types}}
-In the block diagonal preconditioner for the two-dimensional linear elasticity problem, there are two DOF types, there are also two block types. However, in more complicated preconditioners, such as the LSC preconditioner, there are more DOF types than there are block types. Below we describe relationship between elemental DOF type classification, meshes, the block preconditioner DOF types, and block types:
-\begin{itemize}
-\item \textbf{Elemental DOF type classification}: Each element classifies it's own DOF type in the function \verb+get_dof_numbers_for_unknowns(...)+. In the case of \verb+MyLinearElasticityElement<2>+ elements, the DOF types are classified as \verb+0+ and \verb+1+. For \verb+QTaylorHoodElement<2>+ elements, the DOF types are classified as \verb+0+ and \verb+1+ for the $x$ and $y$-velocities, and \verb+2+ for the pressure $p$. 
+In the block diagonal preconditioner for the two-dimensional linear elasticity 
+problem, there are two DOF types, there are also two block types. However, in 
+more complicated preconditioners, such as the LSC preconditioner, there are 
+more DOF types than there are block types. To see this, consider  using the 
+LSC preconditioner on a 2D problem, we have two velocity DOF types, $x$ and 
+$y$-velocities, and one pressure DOF type, $p$. But the LSC preconditioner 
+works with velocity and pressure block types, the two velocity DOF types are 
+combined to form one block type. Below we describe relationship between 
+elemental DOF type classification, meshes, the block preconditioner DOF types, 
+and block types:
 
-\item \textbf{The role of meshes}: Within the block preconditioning framework, each mesh acts as a container for a set of DOF type classifications. All elements in the same mesh MUST return the same \verb+ndof_types()+ value. If two different element types are in the same mesh, and their \verb+ndof_types()+ does indeed return the same number, then their elementtal DOF type classifcations will be treated as the same type. For example, the \verb+QTaylorHoodElement<2>+ classifies the DOF types as follows:
+
+\subsubsection{Elemental DOF type classification}
+
+Each element classifies it's own DOF type in the function 
+\texttt{get\_\allowbreak dof\_\allowbreak numbers\_\allowbreak for\_\allowbreak unknowns(...)}. In the case of 
+\texttt{My\allowbreak Linear\allowbreak Elasticity\allowbreak Element<2>} elements, the DOF types are classified as 
+\texttt{0} and \texttt{1}. For \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements, the DOF types are classified as \texttt{0} and \texttt{1} for the $x$
+and $y$-velocities, and \texttt{2} for the pressure $p$, as depicted in Figure \ref{fig:2DTH_DOF_classification}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{./pic/taylorhood_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s 
+\texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} elements.}
+\label{fig:2DTH_DOF_classification}
+\end{figure}
+
+\subsubsection{The role of meshes}
+
+Within the block preconditioning framework, each mesh acts as a container for 
+a set of DOF type classifications. All elements in the same mesh \emph{must} 
+return the same \texttt{ndof\_\allowbreak types()} value. If two different 
+element types are in the same mesh, and their \texttt{ndof\_\allowbreak types()}
+does indeed return the same number, then their elemental DOF type 
+classifications will be treated as the same type. For example, recall in 
+Figure \ref{fig:2DTH_DOF_classification} that the elemental DOF types 
+classification for \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements are as follows:
 \begin{itemize}
- \item \verb+0+ $x$-velocity
- \item \verb+1+ $y$-velocity
- \item \verb+2+ $p$-pressure
+  \item \texttt{0} $x$-velocity
+  \item \texttt{1} $y$-velocity
+  \item \texttt{2} $p$-pressure
 \end{itemize}
-If we wish to impose parallel outflow along a boundary, we attach 
+If we wish to constrain the flow along a boundary, we can attach the 
+\texttt{Face\allowbreak Element}s 
+\texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak Element<ELEMENT>} 
+along the appropriate boundary as shown in the demo problem: Steady 
+finite-Reynolds-number flow through an iliac bifurcation, these 
+\texttt{Face\allowbreak Element}s classifies the `bulk' velocity DOF types 
+as well as it's own DOF type as shown in Figure 
+\ref{fig:2DFACE_DOF_classification}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{./pic/faceelemenet_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s 
+ \texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak Element<ELEMENT>} elements.}
+\label{fig:2DFACE_DOF_classification}
+\end{figure}
 
-\noindent\verb+ImposeParallelOutflowElement<ELEMENT>+, see demo problem: Steady finite-Reynolds-number flow through an iliac bifurcation, these \verb+FaceElement+s classifies the bulk DOF types as follows:
-\begin{itemize}
- \item \verb+0+ constrained $x$-velocity
- \item \verb+1+ constrained $y$-velocity
- \item \verb+2+ $L$-Lagrange multiplier
-\end{itemize}
-Although the \verb+ndof_types()+ for these two different elements are the same, there are clearly six distinct DOF types. To ensure that the block preconditioning framework treats these as different DOF types, we must have two meshes for the two different type of elements. If we put the two elements types in the same mesh, then the block preconditioning framework will not distinguish between the two \verb+0+ elemental DOF types, i.e. $x$-velocity is the same as constrained $x$-velocity. The same applies to elemental DOF types \verb+1+ and \verb+2+. Within the block preconditioning framework, there is a built-in check to throw an error if a mesh passed to the framework contains multiple types of elements. This check can be avoided by setting the optional argument \verb+allow_multiple_element_type_in_mesh+ when calling the function \verb+set_mesh(...)+ to true, in this case, the framework will check if the \verb+ndof_types()+ of all the elements of the same mesh are the same.
+Although the \texttt{ndof\_\allowbreak types()} for these two different elements are the same,
+there are clearly six distinct DOF types. To ensure that the block 
+preconditioning framework treats these as different DOF types, we must have two
+meshes for the two different type of elements. If we put the two elements types
+in the same mesh, then the block preconditioning framework will not distinguish
+between the two \texttt{0} elemental DOF types, i.e. $x$-velocity is the same as 
+constrained $x$-velocity. The same applies to the remaining two elemental 
+DOF types \texttt{1} and \texttt{2}. Within the block preconditioning framework, 
+there is a built-in check to throw an error if a mesh passed to the framework 
+contains multiple types of elements. This check can be avoided by setting the 
+optional argument 
+\texttt{allow\_\allowbreak multiple\_\allowbreak element\_\allowbreak type\_\allowbreak in\_\allowbreak mesh} 
+when calling the function \texttt{set\_\allowbreak mesh(...)} to \texttt{true}. 
+In this case, the framework will check if the \texttt{ndof\_\allowbreak types()} 
+of all the elements of the same mesh are the same.
 
-\item \textbf{Block preconditioner DOF types}: The different meshes instructs the block preconditioning framework how to order the elemental DOF types (the \verb+ndof_types()+ function provides an offset). For example, consider the above \verb+vmtk+ problem, the first mesh (the bulk mesh) says the first three elemental DOF types are \verb+0+ , \verb+1+ and \verb+2+ (we know that this corresponds to the $x$ and $y$-velocities and pressure). At this stage the offset is \verb+0+ and the block preconditioner DOF types \verb-0+0-, \verb-1+0- and \verb-2+0-. The second mesh (the surface mesh) also has DOF types \verb+0+ , \verb+1 +and \verb+2+, but because it is a different mesh, the offset is now updated to the sum of the \verb+ndof_types()+ of the first element in all previous meshes (hence it is vital that the \verb+ndof_types()+ of all the elements in a single mesh is the same, although the elements types may be different), in this case it is \verb+3+. The DOF types in the block preconditioner for the surface mesh are \verb-0+3- , \verb-1+3- and \verb-2+3- (which we know corresponds to the constrained $x$ and $y$-velocities and the Lagrange multiplier DOF type). It is important to note that the order of the meshes determines the order of the block preconditioner DOF type enumeration. To this end, where the ordering of the block preconditioner DOF types matters (such as the LSC preconditioner), the block preconditioner should handle the ordering of the meshes, the user should use functions such as \verb+set_navier_stokes_mesh(...)+ in the case of the \verb+NavierStokesSchurComplementPreconditioner+. We call the ordering of the preconditioner DOF types, determined by the elemental DOF type ordering and the ordering of the meshes, the \emph{natural ordering} of the preconditioner DOF types. For the above example, the natural ordering of the preconditioner DOF types would be:
+\subsubsection{Block preconditioner DOF types}
+The information contained in different meshes allow the BPF to order the elemental
+DOF types (note that the function \texttt{ndof\_\allowbreak types()} provides 
+the block offset). For example, consider the above \texttt{vmtk} RAYFIX problem, 
+the first mesh (the bulk mesh) contain elements with elemental DOF types 
+\texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-velocities and pressure
+respectively. The second mesh (the surface mesh) contain elements with elemental
+DOF types \texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-constrained 
+velocities and Lagrange multiplier respectively. Let $N$ be the 
+number of meshes, $N_i$ be the number of elemental DOF types in mesh $i$,
+$E_i = 0, \ldots N_i - 1$ be the elemental DOF types in mesh $i$, $B_{i,E_i}$ 
+be the corresponding block preconditioner DOF types. Then the relationship 
+between the block preconditioner DOF type $B_{i,E_i}$ and elemental DOF type
+$E_i$ is given by
+\begin{equation*}
+  B_{i,E_i} = E_i + \sum_{i=0}^{N - 1} N_i, \quad \mbox{for } E_i = 0,\ldots N_i.
+\end{equation*}
+Figure \ref{fig:elemental_to_block_dof_classification} shows the mapping between
+elemental DOF types and block preconditioner DOF types for the example above.
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/elemental_to_block_dof_classification.pdf}
+\caption{Relationship between the classification of elemental DOF types and block
+         preconditioner DOF types.}
+\label{fig:elemental_to_block_dof_classification}
+\end{figure}
+
+It is important to note that within the BPF, when multiple meshes are used, the
+block preconditioner DOF types admit to a two-level ordering: first by the mesh 
+they belong to, and then by the elemental DOF type within the mesh. To this end, 
+where the ordering of the block preconditioner DOF types matters (such as the 
+LSC preconditioner), the block preconditioner should handle the ordering of the 
+meshes, the user should use functions such as 
+\texttt{set\_\allowbreak navier\_\allowbreak stokes\_\allowbreak mesh(...)}
+in the case of the 
+\texttt{Navier\allowbreak Stokes\allowbreak Schur\allowbreak Complement\allowbreak Preconditioner} 
+since the LSC preconditioner know where the Navier-Stokes mesh need to be in 
+the order of the meshes. We refer the ordering of the preconditioner DOF types, 
+determined by the elemental DOF type and the ordering of the meshes, the 
+\emph{natural ordering} of the preconditioner DOF types. For the above example, the natural ordering of the preconditioner DOF
+types would be:
 \begin{itemize}
  \item \verb+0+ $x$-velocity
  \item \verb+1+ $y$-velocity
@@ -180,8 +276,8 @@ Although the \verb+ndof_types()+ for these two different elements are the same, 
 
 Note: Each DOF can be classified more than once. If this is the case, then the classification will be the last mesh visited by the block preconditioning framework. This should not be an issue if you do not have discontinuous boundary conditions.
 
-\item \textbf{Block types}: The block types are the blocks of sub-matrices the block preconditioner works with. Block types may contain more than one preconditioner DOF types or be as fine grain as the number of preconditioner DOF types. Note: There can not be more block types than there are preconditioner DOF types. For example, in case of the the LSC preconditioner (in 2D) we have three DOF types ($x$ , $y$-velocities, and pressure), but the preconditioner only distinguishes between velocity and pressure DOF types, thus we have two block types (velocity block and pressure block). The setup of the block types are handled by the function... \verb+block_setup(...)+. The setup of the blocks and DOF types will be discussed in more detail later on.
-\end{itemize}
+\subsubsection{Block types}
+The block types are the blocks of sub-matrices the block preconditioner works with. Block types may contain more than one preconditioner DOF types or be as fine grain as the number of preconditioner DOF types. Note: There can not be more block types than there are preconditioner DOF types. For example, in case of the the LSC preconditioner (in 2D) we have three DOF types ($x$ , $y$-velocities, and pressure), but the preconditioner only distinguishes between velocity and pressure DOF types, thus we have two block types (velocity block and pressure block). The setup of the block types are handled by the function... \verb+block_setup(...)+. The setup of the blocks and DOF types will be discussed in more detail later on.
 
 
 %%%% MASTER AND SUBSIDIARY PRECONDITIONER
