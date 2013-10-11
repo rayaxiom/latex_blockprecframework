@@ -173,7 +173,7 @@ elements, the DOF types are classified as \texttt{0} and \texttt{1} for the $x$
 and $y$-velocities, and \texttt{2} for the pressure $p$, as depicted in Figure \ref{fig:2DTH_DOF_classification}.
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{./pic/taylorhood_dof_classification.pdf}
+\includegraphics[width=0.8\textwidth]{./pic/taylorhood_dof_classification.pdf}
 \caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
   \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} elements. The square,
   triangle and circle symbolises the DOF types within the element. Each element
@@ -353,145 +353,257 @@ we refer to these preconditioners as subsidiary preconditioners.
 \texttt{Oomph-lib}'s block preconditioning framework facilitates the reuse of 
 existing preconditioners as subsidiary preconditioners.
 
-It is important to note that we do not need to consider the block structure of 
-subsidiary block preconditioners when developing master preconditioners. 
-However, the master preconditioner must be aware of the preconditioner DOF type 
-ordering assumed by subsidiary preconditioner. For example, if the LSC 
-preconditioner is a subsidiary preconditioner (as is the case of the FSI 
-preconditioner), the FSI preconditioner must ensure that the last preconditioner 
-DOF type given to the LSC preconditioner is the pressure DOF type, and the 
-preconditioner DOF types before that are the velocity DOF types.
+It is important to note that we do not need to consider the block structure of
+subsidiary block preconditioners when developing master preconditioners.
+However, the master preconditioner must be aware of the preconditioner DOF type
+ordering assumed by subsidiary preconditioner. For example, if the LSC
+preconditioner is a subsidiary preconditioner (as is the case of the Augmented
+Lagrangian preconditioner preconditioner), the Augmented Lagrangian
+preconditioner must ensure that the last preconditioner DOF type given to the
+LSC preconditioner is the pressure DOF type, and the preconditioner DOF types
+before that are the velocity DOF types.
 
-% RAYHERE
-For each problem, only one master preconditioner is defined and the remaining preconditioners in the hierarchy are all considered to be subsidiary preconditioners. Each subsidiary preconditioner holds a pointer to the preconditioner one level up in the hierarchy.
+For each problem, only one master preconditioner is defined and the remaining
+preconditioners in the hierarchy are all considered to be subsidiary
+preconditioners. Each subsidiary preconditioner holds a pointer to the
+preconditioner one level higher in the hierarchy. Figure
+\ref{fig:bpf_hierarchy_tree_crop} illustrates an example of a hierarchical tree
+generated as a result of multiple levels of subsidiary preconditioning. Figure
+\ref{fig:bpf_hierarchy_matrixstructure_crop} shows the structure of the
+matrices and preconditioners for the same hierarchical tree as Figure
+\ref{fig:bpf_hierarchy_tree_crop}.
 
-There is only one `true' master preconditioner, the rest are all subsidiary 
-preconditioners, each subsidiary preconditioner holds a pointer to the 
-preconditioner one level up in the hierarchy. Say, there are three 
-preconditioners, $P1$, $P2$ and $P3$. If we use $P2$ to solve a subsidiary 
-system in $P1$, and $P3$ to solve a subsidiary system in $P2$, then it could be 
-said that $P1$ is the master preconditioner for $P2$, and $P2$ is a master 
-preconditioner for $P3$. However, because $P2$'s 
-\texttt{Master\_\allowbreak block\_\allowbreak preconditioner\_\allowbreak pointer\_\allowbreak pt} is not null, it is automatically 
-classed as a subsidiary preconditioner. Only the true master preconditioner (so 
-that the \texttt{Master\_\allowbreak block\_\allowbreak preconditioner\_\allowbreak pt} is null) holds all the information
-about the DOF types and look-up schemes. If a subsidiary preconditioner requires 
-information held only by the master preconditioner, it will go to it's `master'
-preconditioner. If this `master' preconditioner is a subsidiary preconditioner, 
-it will again go up the hierarchy to it's master preconditioner.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{./pic/bpf_hierarchy_tree_crop.pdf}
+\caption{An example of a hierarchical tree resulting from multiple levels of
+  subsidiary preconditioning. The master preconditioner is the Augmented
+  Lagrangian preconditioner. When applying the master preconditioner, we can
+  use existing preconditioners for the subsidiary systems, this process is
+  depicted in Figure \ref{fig:bpf_hierarchy_matrixstructure_crop}.}
+\label{fig:bpf_hierarchy_tree_crop}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/bpf_hierarchy_matrixstructure_crop.pdf}
+\caption{The structures of the matrices and corresponding preconditioners for
+  the hierarchical tree structure presented in Figure
+  \ref{fig:bpf_hierarchy_tree_crop}. The top left is the Jacobian resulting
+  from Newton's method, to the right we have the corresponding Augmented
+  Lagrangian preconditioner (see the matrices on the first row). The Augmented
+  Lagrangian preconditioner requires the solution of two subsidiary systems, in
+  particular, a modified Navier-Stokes subsystem. We can further approximate
+  this subsystem with the Navier-Stokes LSC precondition (see the matrices on
+  the second row). Applying Navier-Stokes LSC preconditioner requires the
+  solution of the modified momentum block, which we can approximate with an
+  upper block triangular preconditioner (see the third row).}
+\label{fig:bpf_hierarchy_matrixstructure_crop}
+\end{figure}
+
+%Say, there are three
+%preconditioners, $P1$, $P2$ and $P3$. If we use $P2$ to solve a subsidiary
+%system in $P1$, and $P3$ to solve a subsidiary system in $P2$, then it could be
+%said that $P1$ is the master preconditioner for $P2$, and $P2$ is a master
+%preconditioner for $P3$. However, because $P2$'s \texttt{Master\_\allowbreak
+%  block\_\allowbreak preconditioner\_\allowbreak pointer\_\allowbreak pt} is
+%not null, it is automatically classed as a subsidiary preconditioner. Only the
+%true master preconditioner (so that the \texttt{Master\_\allowbreak
+%  block\_\allowbreak preconditioner\_\allowbreak pt} is null) holds all the
+%information about the DOF types and look-up schemes. If a subsidiary
+%preconditioner requires information held only by the master preconditioner, it
+%will go to it's `master' preconditioner. If this `master' preconditioner is a
+%subsidiary preconditioner, it will again go up the hierarchy to it's master
+%preconditioner.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% USING THE SIMPLE DIAGONAL BLOCK PRECONDITIONER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Using the Simple Block Preconditioner\label{sec:using_the_simple_block_preconditioner}}
-%
-%We begin our discussion of the implementation details by demonstrating how to 
-%use the preconditioner (implemented in the class 
-%\verb+SimpleBlockDiagonalPreconditioner+) in an actual driver code 
-%
-%(\verb+two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc+).
-%
-%In the problem constructor, we construct the solver and preconditioner combination. We specify the GMRES iterative solver, and, if available, use the distributed version implemented in \verb+TrilinosAztecOOSolver+.
-%\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-%\lstinputlisting[firstnumber=348, firstline=348, lastline=361]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
-%Then we construct an instance of the preconditioner. This linear elasticity problem contains one types of element used for preconditioning (see section \ref{sec:block_preconditionable_elements}). There also exists \verb+LinearElasticityTractionElement+, but in this case the block preconditioner does not require the surface mesh since the bulk mesh contains all the DOFs that needs to be classified and \verb+MyLinearElasticityElement+ does classify all the DOF in the bulk mesh. We store
-%the different element types in seperate meshes. Only the bulk mesh is passed to the preconditioner. Finally, the preconditioner is passed to the 
-%solver.
-%\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-%\lstinputlisting[firstnumber=363,firstline=363, lastline=373]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
-%In the main function,
-%\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-%\lstinputlisting[firstnumber=450,firstline=450, lastline=454]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
-%we create an instance of the  problem which problem can now be solved in the normal \verb+oomph-lib+ fashion:
-%\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-%\lstinputlisting[firstnumber=466,firstline=466, lastline=480]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
-%
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%% IMPLEMENTING A BLOCK DIAGONAL PRECONDITIONER
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%\section{The implementation of a block diagonal preconditioner\label{sec:the_implementation_of_a_block_diagonal_preconditioner}}
-%
-%We discuss the implementation of a block preconditioner within
-%\verb+oomph-lib+'s block preconditioning framework. In particular, we will address three fundamental tasks:
-%\begin{itemize}
-%\item How to identify and classify the DOFs in the underlying \verb+Problem+.
-%\item How to extract subsidiary matrix blocks from the full Jacobian.
-%\item How to recycle existing preconditioning operators within new preconditioners.
-%\end{itemize}
-%
-%We implement the block diagonal preconditioner in the
-%class \verb+SimpleBlockDiagonalPreconditioner+. This class inherits
-%from the base class \verb+BlockPreconditioner+ which provides the generic 
-%functionality required for common block preconditioning operations.
-%\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-%\lstinputlisting[firstnumber=53,firstline=53, lastline=55]{./code/simple_block_preconditioners.h}
-%This preconditioner requires a \verb+Vector+ of pointers to \verb+Preconditioner+s for each diagonal block matrix.
-%\lstinputlisting[firstnumber=97,firstline=97, lastline=99]{./code/simple_block_preconditioners.h}
-%
-%%%%% CONSTRUCTOR FOR BLOCK DIAGONAL PRECONDITIONER
-%\subsection{Constructor for block diagonal preconditioner\label{sec:constructor_for_block_diagonal_preconditioner}}
-%The constructor is usually used to initialised variables. In this case, there is nothing to initialise.
-%\lstinputlisting[firstnumber=59,firstline=59, lastline=62]{./code/simple_block_preconditioners.h}
-%
-%%%%% CONSTRUCTOR FOR BLOCK DIAGONAL PRECONDITIONER
-%\subsection{setup(...) for block diagonal preconditioner\label{sec:block_diagonal_preconditioner_setup}}
-%
-%Like all preconditioners, \verb+BlockPreconditioners+ have two key
-%functions, \verb+setup(...)+ and \verb+preconditioner_solve(...)+ both of which are discussed in more detail in the \verb+oomph-lib+ Linear Solvers Tutorial [CITE]. We begin by considering the function \verb+setup(...)+.
-%\lstinputlisting[firstnumber=107,firstline=107, lastline=109]{./code/simple_block_preconditioners.h}
-%At the simplest level, \verb+Meshes+ are just containers for elements. To reiterate section \ref{sec:dof_types_and_block_types}, storing different element type in separate meshes enables the \verb+BlockPreconditioner+ to differentiate between the elemental DOF types of different element types. The order of the meshes determine the order of the preconditioner DOF types.
-%Therefore, in more sophisticated preconditioners, the preconditioner usually handle the calls to \verb+set_nmesh(...)+ and \verb+set_mesh(...)+ functions. For this simplistic case, the functions \verb+set_nmesh(...)+ and \verb+set_mesh(...)+ were called in the driver code (see section \ref{sec:using_the_simple_block_preconditioner}).
-%
-%Passing the meshes to \verb+BlockPreconditioner+ gives the framework access to the
-%meshes and allows the preconditioner write access to the number of DOF types associated with the elements in each mesh.
-%
-%\subsubsection{block\_setup(...)\label{sec:block_setup}}
-%The next step is to define a mapping from DOF number to block
-%number. This preconditioner's block type is as fine grain as the preconditioner DOF types. To see this, recall, if the Jacobian (partitioned into DOF types) takes the form 
-%\begin{equation*}
-%J =
-%\begin{bmatrix}
-%S_{xx}&S_{xy} \\
-%S_{yx}&S_{yy}
-%\end{bmatrix},
-%\end{equation*}
-%then the preconditioner is
-%\begin{equation*}
-%P_{diag} =
-%\begin{bmatrix}
-%S_{xx}& \\
-%      &S_{yy}
-%\end{bmatrix}.
-%\end{equation*}
-%It is clear that the blocks the preconditioner works with has to be as fine grain as the DOF types. This is achieved by calling the function \verb+block_setup(...)+ with no arguments. By default, this has the same effect as calling \verb+block_setup(...)+ with the identity \verb+dof_to_block_map+ Vector \verb+=+ \verb+[0 1]+.
-%\lstinputlisting[firstnumber=111,firstline=111, lastline=112]{./code/simple_block_preconditioners.h}
-%
-%For this simple block diagonal preconditioner, there is method of changing the \verb+dof_to_block_map+ Vector. There exists a more sophisticated version of the block diaginal preconditioner in the class \verb+GeneralPurposeBlockPreconditioner+, where there exists a function
-%
-%\noindent\verb+set_dof_to_block_map(Vector<unsigned>& dof_to_block_map)+
-%to change the \verb+dof_to_block_map+ from the default. Subtilties of the \verb+dof_to_block_map+ Vector is discussed below.
-%
-%\subsubsection{block\_setup(...): Combining DOF types\label{sec:block_setup_combining_dof_types}}
-%If we want a block type to consist of more than one preconditioner DOF type, then we can provide a \verb+dof_to_block_map+ to the function \verb+block_setup(...)+ describing the mapping we want. For example, if we extend the example above so there are three DOF types,
-%\begin{equation*}
-%J =
-%\begin{bmatrix}
-%S_{xx}&S_{xy}&S_{xz} \\
-%S_{yx}&S_{yy}&S_{yz} \\
-%S_{zx}&S_{zy}&S_{zz}
-%\end{bmatrix},
-%\end{equation*}
-%and instead of simply using the diagonal blocks, we want to use a block preconditioner of the following form
-%\begin{equation*}
-%\tilde{P}_{diag} =
-%\begin{bmatrix}
-%S_{xx}&S_{xy}&       \\
-%S_{yx}&S_{yy}&       \\
-%      &      &S_{zz}
-%\end{bmatrix}.
-%\end{equation*}
-%That is, we want to group the first two preconditioner DOF types as one block type and the last preconditioner DOF type as a separate block type. This is achieved by passing the \verb+dof_to_block_map+ \verb+=+ \verb+[0 0 1]+ to the function \verb+block_setup(...)+, we see a similar \verb+dof_to_block_map+ in the implementation of the LSC preconditioner. It is important to note that although the (in C++ index notation) block (0,0) consists of preconditioner DOF types 
+
+We begin our discussion of the implementation details by demonstrating how to
+use the preconditioner (implemented in the class \texttt{Simple\allowbreak
+  Block\allowbreak Diagonal\allowbreak Preconditioner}) in an actual driver
+code (\texttt{two\_\allowbreak d\_\allowbreak linear\_\allowbreak
+  elasticity\_\allowbreak with\_\allowbreak simple\_\allowbreak
+  block\_\allowbreak diagonal\_\allowbreak preconditioner\allowbreak
+  .\allowbreak cc}).
+
+In the problem constructor, we construct the solver and preconditioner
+combination. We specify the GMRES iterative solver, and, if available, use the
+distributed version implemented in \texttt{Trilinos\allowbreak Aztec\allowbreak
+  OO\allowbreak Solver}.  \lstset{numberstyle=\scriptsize,breaklines=true,
+  numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize,
+  showstringspaces=false, language=C++} \lstinputlisting[firstnumber=348,
+firstline=348,
+lastline=361]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+
+
+Next we construct an instance of the preconditioner. Recall in Section
+\ref{sec:framework_overview} that the order of the preconditioner DOF types is
+determined by the elements, thus it is required that the preconditioner has
+access to the elements which classify all the DOFs. This linear elasticity
+problem contains one type of element used for preconditioning, i.e. the linear
+elasticity elements should and do classify all the DOFs (see Section
+\ref{sec:block_preconditionable_elements}). The linear elasticity elements are
+stored in the so-called `bulk' mesh which is passed to the preconditioner via
+two functions, \texttt{set\_\allowbreak nmesh(...)} \texttt{set\_\allowbreak
+  mesh(...)}. 
+\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
+\lstinputlisting[firstnumber=363,firstline=363, lastline=370]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+The function \texttt{set\_\allowbreak nmesh(...)} must be called before the function \texttt{set\_\allowbreak mesh(...)} to let the BPF how many meshes there will be. Then we call the function \texttt{set\_\allowbreak mesh(...)} passing with the unsigned value \texttt{0} to indicate that the \texttt{Mesh} should go in the first position and a pointer to the \texttt{Mesh} (recall that the order of the meshes matter).
+Finally, the preconditioner is passed to the solver.
+\lstinputlisting[firstnumber=372,firstline=372, lastline=373]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+
+
+In the main function,
+\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
+\lstinputlisting[firstnumber=450,firstline=450, lastline=454]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+we create an instance of the  problem which problem can now be solved in the normal \texttt{oomph-\allowbreak lib} fashion:
+\lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
+\lstinputlisting[firstnumber=466,firstline=466, lastline=480]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+
+In the driver source code, you may notice \texttt{Linear\allowbreak
+  Elasticity\allowbreak Traction\allowbreak Element}s.  But the block
+preconditioner does not need any information from these elements since the
+elements in the bulk mesh already classify all the DOFs. We store the different
+element types in different meshes. Only the bulk mesh is passed to the
+preconditioner. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% IMPLEMENTING A BLOCK DIAGONAL PRECONDITIONER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The implementation of a block diagonal preconditioner\label{sec:the_implementation_of_a_block_diagonal_preconditioner}}
+
+We discuss the implementation of a block diagonal preconditioner within
+\texttt{oomph-\allowbreak lib}'s block preconditioning framework. In particular, we will
+address three fundamental tasks: 
+\begin{itemize} 
+  \item How to identify and classify the DOFs in the underlying \texttt{Problem}.  
+  \item How to extract subsidiary matrix blocks from the original matrix.
+  \item How to reuse existing preconditioning operators within new preconditioners.
+\end{itemize}
+
+We implement the block diagonal preconditioner in the class
+\texttt{Simple\allowbreak Block\allowbreak Diagonal\allowbreak Preconditioner}.
+This class inherits from the base class \texttt{Block\allowbreak
+  Preconditioner} which provides the generic functionality required for common
+block preconditioning operations:
+\lstset{numberstyle=\ttfamily\scriptsize,
+        breaklines=true, 
+        numbers=left, 
+        stepnumber=2, 
+        frame=single,
+        basicstyle=\ttfamily\scriptsize, 
+        showstringspaces=false, 
+        language=C++}
+\lstinputlisting[firstnumber=53,firstline=53, lastline=55]{./code/simple_block_preconditioners.h}
+This preconditioner requires a \texttt{Vector} of pointers to \texttt{Preconditioner}s for each diagonal block matrix.
+\lstinputlisting[firstnumber=97,firstline=97, lastline=99]{./code/simple_block_preconditioners.h}
+
+%%%% CONSTRUCTOR FOR BLOCK DIAGONAL PRECONDITIONER
+\subsection{Constructor for block diagonal preconditioner\label{sec:constructor_for_block_diagonal_preconditioner}}
+The constructor is usually used to initialised variables. In this case, there is nothing to initialise:
+\lstinputlisting[firstnumber=59,firstline=59, lastline=62]{./code/simple_block_preconditioners.h}
+
+%%%% CONSTRUCTOR FOR BLOCK DIAGONAL PRECONDITIONER
+\subsection{\texttt{setup(...)} for block diagonal preconditioner\label{sec:block_diagonal_preconditioner_setup}}
+
+Like all preconditioners, \texttt{Block\allowbreak Preconditioners} have two
+key functions, \texttt{setup(...)} and \texttt{preconditioner\_\allowbreak
+  solve(...)} both of which are discussed in more detail in the
+\texttt{oomph-\allowbreak lib} Linear Solvers Tutorial [CITE]. We begin by
+considering the function \texttt{setup(...)}:
+\lstinputlisting[firstnumber=107,firstline=107,lastline=109]{./code/simple_block_preconditioners.h} 
+At the simplest level, \texttt{Mesh}es are regarded as containers for elements. To
+reiterate Section~\ref{sec:dof_types_and_block_types}, storing different
+element type in separate meshes enables the \texttt{BlockPreconditioner} to
+differentiate between the elemental DOF types of different element types. The
+order of the meshes determine the order of the preconditioner DOF types.
+Therefore, in more sophisticated preconditioners, the preconditioner usually
+handle the calls to \texttt{set\_\allowbreak nmesh(...)} and
+\texttt{set\_\allowbreak mesh(...)} functions.  For this simplistic case, the
+functions \texttt{set\_\allowbreak nmesh(...)} and \texttt{set\_\allowbreak
+  mesh(...)} were called in the driver code (see section
+\ref{sec:using_the_simple_block_preconditioner}).
+
+Passing the meshes to \texttt{Block\allowbreak Preconditioner} gives the
+framework access to the meshes and allows the preconditioner write access to
+the number of DOF types associated with the elements in each mesh.
+
+\subsubsection{\texttt{block\_setup(...)}\label{sec:block_setup}}
+The next step is to define a mapping from DOF number to block number. This
+preconditioner's block type is as fine grain as the preconditioner DOF types.
+To see this, recall, if the Jacobian (partitioned into DOF types) takes the
+form 
+\begin{equation*}
+J =
+\begin{bmatrix}
+J_{xx}&J_{xy} \\
+J_{yx}&J_{yy}
+\end{bmatrix},
+\end{equation*}
+then the preconditioner is
+\begin{equation*}
+P_{diag} =
+\begin{bmatrix}
+J_{xx}& \\
+      &J_{yy}
+\end{bmatrix}.
+\end{equation*}
+It is clear that the blocks the preconditioner works with has to be as fine
+grain as the DOF types. This is achieved by calling the function
+\texttt{block\_\allowbreak setup(...)} with no arguments. By default, this has
+the same effect as calling \texttt{block\_\allowbreak setup(...)} with the
+identity \texttt{dof\_\allowbreak to\_\allowbreak block\_\allowbreak map}
+\texttt{Vector \allowbreak =\allowbreak [0 1]}.
+\lstinputlisting[firstnumber=111,firstline=111, lastline=112]{./code/simple_block_preconditioners.h}
+
+For this simple block diagonal preconditioner, there is method of changing the
+\texttt{dof\_\allowbreak to\_\allowbreak block\_\allowbreak map}
+\texttt{Vector}. There exists a more sophisticated version of the block
+diagonal preconditioner in the class \texttt{General\allowbreak
+  Purpose\allowbreak Block\allowbreak Preconditioner}, where there exists a
+function
+
+\texttt{set\_\allowbreak dof\_\allowbreak to\_\allowbreak block\_\allowbreak
+  map(Vector<unsigned>\& dof\_\allowbreak to\_\allowbreak block\_\allowbreak
+  map)} to change the \texttt{dof\_\allowbreak to\_\allowbreak
+  block\_\allowbreak map} from the default. Subtitles of the
+\texttt{dof\_\allowbreak to\_\allowbreak block\_\allowbreak map}
+\texttt{Vector} is discussed below.
+
+\subsubsection{\texttt{block\_setup(...)}: Combining DOF types\label{sec:block_setup_combining_dof_types}}
+If we want a block type to consist of more than one preconditioner DOF type,
+then we can provide a \texttt{dof\_\allowbreak to\_\allowbreak
+  block\_\allowbreak map} to the function \texttt{block\_\allowbreak
+  setup(...)} describing the mapping we want. For example, if we extend the
+example above so there are three DOF types,
+\begin{equation*}
+J =
+\begin{bmatrix}
+J_{xx}&J_{xy}&J_{xz} \\
+J_{yx}&J_{yy}&J_{yz} \\
+J_{zx}&J_{zy}&J_{zz}
+\end{bmatrix},
+\end{equation*}
+and instead of simply using the diagonal blocks, we want to use a block
+preconditioner of the following form
+\begin{equation*}
+\tilde{P}_{diag} =
+\begin{bmatrix}
+J_{xx}&J_{xy}&       \\
+J_{yx}&J_{yy}&       \\
+      &      &J_{zz}
+\end{bmatrix}.
+\end{equation*}
+That is, we want to group the first two preconditioner DOF types as one block
+type and the last preconditioner DOF type as a separate block type. This is
+achieved by passing the \verb+dof_to_block_map+ \verb+=+ \verb+[0 0 1]+ to the
+function \verb+block_setup(...)+, we see a similar \verb+dof_to_block_map+ in
+the implementation of the LSC preconditioner. It is important to note that
+although the (in C++ index notation) block (0,0) consists of preconditioner DOF
+types 
 %$\displaystyle
 %\begin{bmatrix}
 %S_{xx}&S_{xy} \\
