@@ -61,8 +61,8 @@ class MyLinearElasticityElement : public virtual QLinearElasticityElement<DIM,3>
  
 public: 
 
- /// \short The number of "blocks" that degrees of freedom in this element
- /// are sub-divided into: The displacement components
+ /// \short The number of types that the degrees of freedom in this element
+ /// are sub-divided into: The DIM displacement components
  unsigned ndof_types()
   {
    return DIM;
@@ -71,7 +71,7 @@ public:
 /// Create a list of pairs for all unknowns in this element,
 /// so the first entry in each pair contains the global equation
 /// number of the unknown, while the second one contains the number
-/// of the "block" that this unknown is associated with.
+/// of the "elemental DOF type" that this unknown is associated with.
 /// (Function can obviously only be called if the equation numbering
 /// scheme has been set up.)
 /// 
@@ -80,14 +80,15 @@ public:
 /// S_y = 1
 /// S_z = 2
 /// 
- void get_dof_numbers_for_unknowns(
-  std::list<std::pair<unsigned long,unsigned> >& block_lookup_list)
+ void get_dof_types_for_unknowns(
+  std::list<std::pair<unsigned long,unsigned> >& dof_type_lookup_list)
   {
    // number of nodes
    unsigned n_node = this->nnode();
    
-   // temporary pair (used to store block lookup prior to being added to list)
-   std::pair<unsigned,unsigned> block_lookup;
+   // temporary pair (used to store elemental DOF type 
+   // lookup prior to being added to list)
+   std::pair<unsigned,unsigned> dof_type_lookup;
    
    // loop over the nodes
    for (unsigned j=0;j<n_node;j++)
@@ -103,15 +104,15 @@ public:
        // with by the element containing their master nodes
        if (local_eqn_number >= 0)
         {
-         // store block lookup in temporary pair: Global equation number
+         // store DOF type lookup in temporary pair: Global equation number
          // is the first entry in pair
-         block_lookup.first = this->eqn_number(local_eqn_number);
+         dof_type_lookup.first = this->eqn_number(local_eqn_number);
          
-         // set block numbers: Block number is the second entry in pair
-         block_lookup.second = i;
+         // set DOF type numbers: DOF type is the second entry in pair
+         dof_type_lookup.second = i;
          
          // add to list
-         block_lookup_list.push_front(block_lookup);
+         dof_type_lookup_list.push_front(dof_type_lookup);
         }
       }
     }
