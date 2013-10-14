@@ -149,7 +149,7 @@ namespace Global_Parameters
  /// Amplitude of traction applied
  double Amplitude = 1.0;
 
- /// \short Specify problem to be solved (boundary conditons for finite or
+ /// \short Specify problem to be solved (boundary conditions for finite or
  /// infinite domain).
  bool Finite=false;
 

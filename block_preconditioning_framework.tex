@@ -10,7 +10,7 @@ Lagrange multipliers.
 The purpose of the block preconditioning framework (BPF) is to facilitate 
 efficient implementation of the block preconditioners in a distributed 
 environment. As such, it represents a software middleware which enables 
-sytematic hierachical construction of block preconditioners for arbitrarily 
+systematic hierachical construction of block preconditioners for arbitrarily 
 complex multiphysics problems by reusing the existing efficient preconditioners
 for the constituent single physics sub-problems. At the same time the BPF hides
 from the end user tedious implementation details associated with blocking of 
@@ -107,14 +107,14 @@ linear residual at the current GMRES iteration.
 %%% FRAMEWORK OVERVIEW
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{ Framework Overview\label{sec:framework_overview}}
-The above example shows that the application of block preconditioners
-require several generic steps:
+The above example shows that the application of block preconditioners require
+two generic steps:
 \begin{itemize}
 \item The classification of the DOFs.
 \item The application of subsidiary preconditioning operators.
 \end{itemize}
-The following subsections describe how these tasks are performed
-within \texttt{oomph-lib}'s block preconditioning framework.
+The following subsections describe how these tasks are performed within
+\texttt{oomph-lib}'s block preconditioning framework.
 
 %%%% BLOCK PRECONDITIONABLE ELEMENTS
 \subsection{Block Preconditionable Elements\label{sec:block_preconditionable_elements}}
@@ -147,10 +147,9 @@ driver code:
 \lstinputlisting[firstnumber=64,firstline=64, lastline=118]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
 Thus, in the \texttt{MyLinearElasticityElement<2>} we have two types of DOF; 
 corresponding to the $x$ and $y$ nodal displacements. They are classified as 
-DOF types \texttt{0} and \texttt{1} respectively.
+DOF types \texttt{0} and \texttt{1} respectively. We refer to the DOF types classified at the element level, the \emph{elemental} DOF type.
 
-%%%% DOF TYPES AND BLOCK TYPES
-\subsection{DOF types and block types\label{sec:dof_types_and_block_types}}
+\subsection{DOF types and block types\label{sec:dof_types_and_block_types_v1}}
 In the block diagonal preconditioner for the two-dimensional linear elasticity 
 problem, there are two DOF types, there are also two block types. However, in 
 more complicated preconditioners, such as the LSC preconditioner, there are 
@@ -159,247 +158,31 @@ LSC preconditioner on a 2D problem, we have two velocity DOF types, $x$ and
 $y$-velocities, and one pressure DOF type, $p$. But the LSC preconditioner 
 works with velocity and pressure block types, the two velocity DOF types are 
 combined to form one block type. Below we describe relationship between 
-elemental DOF type classification, meshes, the block preconditioner DOF types, 
+elemental DOF type classification, meshes, the preconditioner DOF types, 
 and block types:
 
-
 \subsubsection{Elemental DOF type classification}
-
 Each element classifies it's own DOF type in the function 
 \texttt{get\_\allowbreak dof\_\allowbreak types\_\allowbreak for\_\allowbreak unknowns(...)}. In the case of 
 \texttt{My\allowbreak Linear\allowbreak Elasticity\allowbreak Element<2>} elements, the DOF types are classified as 
-\texttt{0} and \texttt{1}. For \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
-elements, the DOF types are classified as \texttt{0} and \texttt{1} for the $x$
-and $y$-velocities, and \texttt{2} for the pressure $p$, as depicted in Figure \ref{fig:2DTH_DOF_classification}.
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{./pic/taylorhood_dof_classification.pdf}
-\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
-  \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} elements. The square,
-  triangle and circle symbolises the DOF types within the element. Each element
-  classifies it's DOFs locally.}
-\label{fig:2DTH_DOF_classification}
-\end{figure}
+\texttt{0} and \texttt{1}.
 
 \subsubsection{The role of meshes}
-
 Within the block preconditioning framework, each mesh acts as a container for 
 a set of DOF type classifications. All elements in the same mesh \emph{must} 
-return the same \texttt{ndof\_\allowbreak types()} value. If two different 
-element types are in the same mesh, and their \texttt{ndof\_\allowbreak types()}
-does indeed return the same number, then their elemental DOF type 
-classifications will be treated as the same type. For example, recall in 
-Figure \ref{fig:2DTH_DOF_classification} that the elemental DOF types 
-classification for \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
-elements are as follows:
-\begin{itemize}
-  \item \texttt{0} $x$-velocity
-  \item \texttt{1} $y$-velocity
-  \item \texttt{2} $p$-pressure
-\end{itemize}
-If we wish to constrain the flow along a boundary, we can attach the 
-\texttt{Face\allowbreak Element}s 
-\texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak Element<ELEMENT>} 
-along the appropriate boundary as shown in the demo problem: Steady 
-finite-Reynolds-number flow through an iliac bifurcation, these 
-\texttt{Face\allowbreak Element}s classifies the `bulk' velocity DOF types 
-as well as it's own DOF type as shown in Figure 
-\ref{fig:2DFACE_DOF_classification}.
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{./pic/faceelemenet_dof_classification.pdf}
-\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
-  \texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak
-    Element<ELEMENT>} elements. The black DOFs represents those classified by
-  the TaylorHood element whilst the red DOFs are those which takes on the
-  \texttt{Face\allowbreak Element} classification. Notice that this
-  \texttt{Face\allowbreak Element} also (re-)classifies the velocity DOF types
-  on the side of the bulk element it is attached to.}
-\label{fig:2DFACE_DOF_classification}
-\end{figure}
+return the same \texttt{ndof\_\allowbreak types()} value.
 
-Although the \texttt{ndof\_\allowbreak types()} for these two different elements are the same,
-there are clearly six distinct DOF types. To ensure that the block 
-preconditioning framework treats these as different DOF types, we must have two
-meshes for the two different type of elements. If we put the two elements types
-in the same mesh, then the block preconditioning framework will not distinguish
-between the two \texttt{0} elemental DOF types, i.e. $x$-velocity is the same as 
-constrained $x$-velocity. The same applies to the remaining two elemental 
-DOF types \texttt{1} and \texttt{2}. Within the block preconditioning framework, 
-there is a built-in check to throw an error if a mesh passed to the framework 
-contains multiple types of elements. This check can be avoided by setting the 
-optional argument 
-\texttt{allow\_\allowbreak multiple\_\allowbreak element\_\allowbreak type\_\allowbreak in\_\allowbreak mesh} 
-when calling the function \texttt{set\_\allowbreak mesh(...)} to \texttt{true}. 
-In this case, the framework will check if the \texttt{ndof\_\allowbreak types()} 
-of all the elements of the same mesh are the same.
-
-\subsubsection{Block preconditioner DOF types}
+\subsubsection{Preconditioner DOF types}
 The information contained in different meshes allow the BPF to order the elemental
 DOF types (note that the function \texttt{ndof\_\allowbreak types()} provides 
-the block offset). For example, consider the above \texttt{vmtk} RAYFIX problem, 
-the first mesh (the bulk mesh) contain elements with elemental DOF types 
-\texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-velocities and pressure
-respectively. The second mesh (the surface mesh) contain elements with elemental
-DOF types \texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-constrained 
-velocities and Lagrange multiplier respectively. Let $N$ be the 
-number of meshes, $N_i$ be the number of elemental DOF types in mesh $i$,
-$E_i = 0, \ldots N_i - 1$ be the elemental DOF types in mesh $i$, $B_{i,E_i}$ 
-be the corresponding block preconditioner DOF types. Then the relationship 
-between the block preconditioner DOF type $B_{i,E_i}$ and elemental DOF type
-$E_i$ is given by
-\begin{equation*}
-  B_{i,E_i} = E_i + \sum_{i=0}^{N - 1} N_i, \quad \mbox{for } E_i = 0,\ldots N_i.
-\end{equation*}
-Figure \ref{fig:elemental_to_block_dof_classification} shows the mapping between
-elemental DOF types and block preconditioner DOF types for the example above.
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{./pic/elemental_to_block_dof_classification.pdf}
-\caption{Relationship between the classification of elemental DOF types and
-  preconditioner DOF types. Since the elemental DOF types are classified
-  locally per element type, the meshes provide an offset used to differentiate
-  the DOF types of different element types. DOFs can be classified more than
-  once, the classification of the DOF will be the type given to it by the last
-  element visited by the BPF which classified the DOF in question.}
-\label{fig:elemental_to_block_dof_classification}
-\end{figure}
-It is important to note that within the BPF, when multiple meshes are used, the
-block preconditioner DOF types admit to a two-level ordering: first by the mesh 
-they belong to, and then by the elemental DOF type within the mesh. To this end, 
-where the ordering of the block preconditioner DOF types matters (such as the 
-LSC preconditioner), the block preconditioner should handle the ordering of the 
-meshes, the user should use functions such as 
-\texttt{set\_\allowbreak navier\_\allowbreak stokes\_\allowbreak mesh(...)}
-in the case of the 
-\texttt{Navier\allowbreak Stokes\allowbreak Schur\allowbreak Complement\allowbreak Preconditioner} 
-since the LSC preconditioner know where the Navier-Stokes mesh need to be in 
-the order of the meshes. We refer the ordering of the preconditioner DOF types, 
-determined by the elemental DOF type and the ordering of the meshes, the 
-\emph{natural ordering} of the preconditioner DOF types. For the above example, 
-the natural ordering of the preconditioner DOF
-types would be:
-\begin{itemize}
- \item \texttt{0} $x$-velocity
- \item \texttt{1} $y$-velocity
- \item \texttt{2} $p$-pressure
- \item \texttt{3} constrained $x$-velocity
- \item \texttt{4} constrained $y$-velocity
- \item \texttt{5} $L$-Lagrange multiplier
-\end{itemize}
-Note: Each DOF can be classified more than once. If this is the case, then the 
-classification will be the last mesh visited by the block preconditioning 
-framework. This should not be an issue if you do not have discontinuous 
-boundary conditions.
+the offset between the elemental DOf types of different element types).
 
 \subsubsection{Block types}
-The block types are the blocks of sub-matrices the block preconditioner works 
-with. Block types may contain more than one preconditioner DOF types or be as 
-fine grain as the number of preconditioner DOF types. I.e. one or more 
-preconditioner DOF types can make one block type (this is desirable if the 
-physics of the underlying problem and the construction of the specific
-preconditioner for it benefit from such classification). For example, in case 
-of the LSC preconditioner (in 2D) we have three DOF types ($x$, $y$-velocities, 
-and pressure), but the preconditioner only distinguishes between velocity and 
-pressure DOF types, thus we have two block types (velocity block and pressure 
-block). There can not be more block types than there are preconditioner DOF
-types. 
-
-
-Converting the elemental DOF types into preconditioner DOF types and then into 
-block types is handled by the function \texttt{block\_\allowbreak setup(...)}.
-We discuss the usage of this function in more detail later. The relationship 
-between elemental DOF types, preconditioner DOF types and block types are 
-summarised in Figure \ref{fig:dof_block_type_relations_crop}.
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{./pic/dof_block_type_relations_crop.pdf}
-\caption{Relationship elemental DOF types, preconditioner DOF types and block
-  types. The arrow indicates the flow of dependency. The BPF requires the
-  correct ordering of the meshes and elemental DOF types, which gives rise to
-  the natural preconditioner DOF type ordering (this is the DOF type ordering
-  assumed by the preconditioner). The BPF then re-orders and combine the
-  relevant the DOF types to produce the required block types. With the block
-  types set up, we are able to use the blocks for preconditioning. In the above
-  example, block$(0,0)$ refers to the whole (combined) velocity block.}
-\label{fig:dof_block_type_relations_crop}
-\end{figure}
-
-
-%%% MASTER AND SUBSIDIARY PRECONDITIONER
-\subsection{Master and Subsidiary Preconditioners\label{sec:master_and_subsidiary_preconditioners}}
-For each generic problem we perform the Jacobian blocking according to the
-previously set rules and construct a preconditioner for that problem.  This
-preconditioner is often referred to as the master preconditioner. Within this
-preconditioner one needs to invert approximately some of the diagonal blocks or
-the associated Schur compliments. This can be achieved by applying in a
-systematic hierarchical manner with suitable preconditioners, referred to as
-the subsidiary preconditioners. Each of subsidiary preconditioners, in turn,
-can be implemented by introducing further subsidiary preconditioners. Such
-decomposition of a master preconditioner leads to a tree-like structure (with a
-master preconditioner in the root and the leaf nodes typically corresponding to
-the scalar sub-problems solved by AMG). The BPF handles this recursive
-tree-like definition of any generic preconditioner.
-
-Consider again the LSC Navier-Stokes preconditioner. If we decide to approximate
-the $\mathbf{F}$ block (the momentum block) by it's diagonal blocks, we can 
-pass the block diagonal preconditioner (discussed in (Distributed) 
-General-Purpose Block Preconditioners) to the LSC preconditioner to use as a 
-subsidiary preconditioner via the function 
-\texttt{set\_\allowbreak f\_\allowbreak preconditioner(...)}. We can do the 
-same with the pressure system with the function 
-\texttt{set\_\allowbreak p\_\allowbreak preconditioner(...)}. In this context, 
-we refer to these preconditioners as subsidiary preconditioners. 
-\texttt{Oomph-lib}'s block preconditioning framework facilitates the reuse of 
-existing preconditioners as subsidiary preconditioners.
-
-It is important to note that we do not need to consider the block structure of
-subsidiary block preconditioners when developing master preconditioners.
-However, the master preconditioner must be aware of the preconditioner DOF type
-ordering assumed by subsidiary preconditioner. For example, if the LSC
-preconditioner is a subsidiary preconditioner (as is the case of the Augmented
-Lagrangian preconditioner preconditioner), the Augmented Lagrangian
-preconditioner must ensure that the last preconditioner DOF type given to the
-LSC preconditioner is the pressure DOF type, and the preconditioner DOF types
-before that are the velocity DOF types.
-
-For each problem, only one master preconditioner is defined and the remaining
-preconditioners in the hierarchy are all considered to be subsidiary
-preconditioners. Each subsidiary preconditioner holds a pointer to the
-preconditioner one level higher in the hierarchy. Figure
-\ref{fig:bpf_hierarchy_tree_crop} illustrates an example of a hierarchical tree
-generated as a result of multiple levels of subsidiary preconditioning. Figure
-\ref{fig:bpf_hierarchy_matrixstructure_crop} shows the structure of the
-matrices and preconditioners for the same hierarchical tree as Figure
-\ref{fig:bpf_hierarchy_tree_crop}.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{./pic/bpf_hierarchy_tree_crop.pdf}
-\caption{An example of a hierarchical tree resulting from multiple levels of
-  subsidiary preconditioning. The master preconditioner is the Augmented
-  Lagrangian preconditioner. When applying the master preconditioner, we can
-  use existing preconditioners for the subsidiary systems, this process is
-  depicted in Figure \ref{fig:bpf_hierarchy_matrixstructure_crop}.}
-\label{fig:bpf_hierarchy_tree_crop}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=1\textwidth]{./pic/bpf_hierarchy_matrixstructure_crop.pdf}
-\caption{The structures of the matrices and corresponding preconditioners for
-  the hierarchical tree structure presented in Figure
-  \ref{fig:bpf_hierarchy_tree_crop}. The top left is the Jacobian resulting
-  from Newton's method, to the right we have the corresponding Augmented
-  Lagrangian preconditioner (see the matrices on the first row). The Augmented
-  Lagrangian preconditioner requires the solution of two subsidiary systems, in
-  particular, a modified Navier-Stokes subsystem. We can further approximate
-  this subsystem with the Navier-Stokes LSC precondition (see the matrices on
-  the second row). Applying Navier-Stokes LSC preconditioner requires the
-  solution of the modified momentum block, which we can approximate with an
-  upper block triangular preconditioner (see the third row).}
-\label{fig:bpf_hierarchy_matrixstructure_crop}
-\end{figure}
+Block preconditioners often have to group preconditioner DOF types into blocks.
+Consider the Navier-Stokes equations in two dimensions, the DOFs can be grouped
+into $x$ and $y$-velocities and pressure, giving rise to three DOF types.
+The LSC preconditioner works with only two block types, velocity and pressure.
+We say the LSC preconditioner has two \emph{block} types.
 
 %Say, there are three
 %preconditioners, $P1$, $P2$ and $P3$. If we use $P2$ to solve a subsidiary
@@ -434,14 +217,12 @@ combination. We specify the GMRES iterative solver, and, if available, use the
 distributed version implemented in \texttt{Trilinos\allowbreak Aztec\allowbreak
   OO\allowbreak Solver}.  \lstset{numberstyle=\scriptsize,breaklines=true,
   numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize,
-  showstringspaces=false, language=C++} \lstinputlisting[firstnumber=348,
-firstline=348,
-lastline=361]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+  showstringspaces=false, language=C++} \lstinputlisting[firstnumber=349,
+firstline=349,
+lastline=362]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
 
 
-Next we construct an instance of the preconditioner. Recall in Section
-\ref{sec:framework_overview} that the order of the preconditioner DOF types is
-determined by the elements, thus it is required that the preconditioner has
+Next we construct an instance of the preconditioner. It is required that the preconditioner has
 access to the elements which classify all the DOFs. This linear elasticity
 problem contains one type of element used for preconditioning, i.e. the linear
 elasticity elements should and do classify all the DOFs (see Section
@@ -450,22 +231,13 @@ stored in the so-called `bulk' mesh which is passed to the preconditioner via
 two functions, \texttt{set\_\allowbreak nmesh(...)} \texttt{set\_\allowbreak
   mesh(...)}. 
 \lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-\lstinputlisting[firstnumber=363,firstline=363, lastline=370]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+\lstinputlisting[firstnumber=364,firstline=364, lastline=371]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
 The function \texttt{set\_\allowbreak nmesh(...)} must be called before the
 function \texttt{set\_\allowbreak mesh(...)} to let the BPF know how many
 meshes there will be. Then we call the function \texttt{set\_\allowbreak
   mesh(...)} passing with the unsigned value \texttt{0} to indicate that the
 \texttt{Mesh} should go in the first position and a pointer to the
-\texttt{Mesh}. At the simplest level, \texttt{Mesh}es are regarded as
-containers for elements. To reiterate
-Section~\ref{sec:dof_types_and_block_types}, storing different element type in
-separate meshes enables the BPF to differentiate between the elemental DOF
-types of different element types. The tow-level ordering of the meshes and then
-the elemental DOF types determine the order of the natural preconditioner DOF
-types.  Therefore, in more sophisticated preconditioners, the preconditioner
-usually handle the calls to \texttt{set\_\allowbreak nmesh(...)} and
-\texttt{set\_\allowbreak mesh(...)} functions (see
-Section~\ref{sec:lsc_block_preconditioner}). For this simplistic case, the
+\texttt{Mesh}. In more sophisticated preconditioners, calls to these two functions are handled by the preconditioner. See Section~\ref{sec:dof_types_and_block_types} for a more detailed discussion on the role of meshes. For this simplistic case, the
 functions \texttt{set\_\allowbreak nmesh(...)} and \texttt{set\_\allowbreak
   mesh(...)} were called in the driver code. Passing the meshes to
 \texttt{Block\allowbreak Preconditioner} gives the preconditioner read access
@@ -473,22 +245,22 @@ to the number of DOF types associated with the elements in each mesh which is
 used to build the lookup schemes required to partition the matrix.
 
 Finally, the preconditioner is passed to the solver.
-\lstinputlisting[firstnumber=372,firstline=372, lastline=373]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+\lstinputlisting[firstnumber=373,firstline=373, lastline=374]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
 
 In the main function,
 \lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-\lstinputlisting[firstnumber=450,firstline=450, lastline=454]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+\lstinputlisting[firstnumber=451,firstline=451, lastline=455]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
 we create an instance of the  problem which problem can now be solved in the
 normal \texttt{oomph-\allowbreak lib} fashion:
 \lstset{numberstyle=\scriptsize,breaklines=true, numbers=left, stepnumber=2, frame=single,basicstyle=\ttfamily\scriptsize, showstringspaces=false, language=C++}
-\lstinputlisting[firstnumber=466,firstline=466, lastline=480]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
+\lstinputlisting[firstnumber=467,firstline=467, lastline=481]{./code/two_d_linear_elasticity_with_simple_block_diagonal_preconditioner.cc}
 
 In the driver source code, you may notice \texttt{Linear\allowbreak
   Elasticity\allowbreak Traction\allowbreak Element}s. But the block
 preconditioner does not need any information from these elements since the
 elements in the bulk mesh already classify all the DOFs. We store the different
 element types in different meshes. Only the bulk mesh is passed to the
-preconditioner. 
+preconditioner.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% IMPLEMENTING A BLOCK DIAGONAL PRECONDITIONER
@@ -559,14 +331,14 @@ J_{yx}&J_{yy}
 \end{equation}
 then a diagonal block preconditioner for \eqref{eq:simpleblockdiagonaljacobian}
 is defined as
-\begin{equation*}
+\begin{equation}
 P_{diag} =
 \begin{bmatrix}
 J_{xx}& \\
       &J_{yy}
 \end{bmatrix}.
 \label{eq:simpleblockdiagonalpreconditioner}
-\end{equation*}
+\end{equation}
 The preconditioner blocks from \eqref{eq:simpleblockdiagonalpreconditioner} are
 as fine grained as the blocks from \eqref{eq:simpleblockdiagonaljacobian}, but
 the matrix from \eqref{eq:simpleblockdiagonaljacobian} has been partitioned
@@ -625,8 +397,8 @@ Section~\ref{sec:lsc_block_preconditioner}. It is important to notice that
 although the $(0,0)$ block 
 $\displaystyle
 \begin{bmatrix}
-S_{xx}&S_{xy} \\
-S_{yx}&S_{yy} 
+J_{xx}&J_{xy} \\
+J_{yx}&J_{yy} 
 \end{bmatrix}
 $
 that contains two preconditioner DOF types $0$ and $1$, it is not guaranteed
@@ -639,7 +411,7 @@ Section~\ref{sec:dof_types_and_block_types}) is:
 \begin{center}
     \begin{tabular}{ | r | c c c |}
     \hline
-    DOF type name: & $S_{x}$ & $S_{y}$ & $S_{z}$ \\ 
+    DOF type name: & $J_{x}$ & $J_{y}$ & $J_{z}$ \\ 
     Natural ordering: & 0 & 1 & 2 \\ 
     \hline
     \end{tabular}
@@ -649,7 +421,7 @@ order:
 \begin{center}
     \begin{tabular}{ | r | c c c |}
     \hline
-    New block order: & $S_{z}$ & $S_{x}$ & $S_{y}$ \\ 
+    New block order: & $J_{z}$ & $J_{x}$ & $J_{y}$ \\ 
     \hline
     \end{tabular}
 \end{center}
@@ -844,7 +616,53 @@ In this section we focus on implementation details of the LSC preconditioner in 
 spatial dimension of the problem, then \texttt{Navier\allowbreak
   Stokes\allowbreak Schur\allowbreak Complement\allowbreak Preconditioner}
 expects \texttt{dim + 1} preconditioner DOF types, \texttt{dim} number of DOF
-types for the velocity and 1 DOF type for the pressure. 
+types for the velocity and 1 DOF type for the pressure. It is clear that we
+need to combine two or more preconditioner DOF types into block types. In
+\texttt{oomph-\allowbreak lib}, the classification of the all DOF types are
+done by enumeration, as a result, the ordering of the elemental DOF types
+affects the ordering of the preconditioner DOF types, which in turn affects the
+preconditioner blocks. Before we continue with the implementation of the LSC
+preconditioner, we re-visit what we know about DOF types and meshes.
+
+\subsubsection{Elemental DOF type classification}
+Each element classifies it's own DOF type in the function 
+For \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements, the DOF types are classified as \texttt{0} and \texttt{1} for the $x$
+and $y$-velocities, and \texttt{2} for the pressure $p$, as depicted in Figure \ref{fig:2DTH_DOF_classification_v1}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{./pic/taylorhood_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
+  \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} elements. The square,
+  triangle and circle symbolises the DOF types within the element. Each element
+  classifies it's DOFs locally.}
+\label{fig:2DTH_DOF_classification_v1}
+\end{figure}
+
+\subsubsection{The role of meshes}
+Within the block preconditioning framework, each mesh acts as a container for 
+a set of DOF type classifications. All elements in the same mesh \emph{must} 
+return the same \texttt{ndof\_\allowbreak types()} value. If two different 
+element types are in the same mesh, and their \texttt{ndof\_\allowbreak types()}
+does indeed return the same number, then their elemental DOF type 
+classifications will be treated as the same type. For example, recall in 
+Figure \ref{fig:2DTH_DOF_classification_v1} that the elemental DOF types 
+classification for \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements are as follows:
+\begin{itemize}
+  \item \texttt{0} $x$-velocity
+  \item \texttt{1} $y$-velocity
+  \item \texttt{2} $p$-pressure
+\end{itemize}
+The order of the meshes together with the order of the elemental DOF types form
+the natural preconditioner DOF type ordering, see
+Section~\ref{sec:dof_types_and_block_types} for more details on the ordering of
+the DOF types.  Since the LSC preconditioner takes only one mesh, namely the
+Navier-Stokes mesh, via the function \texttt{set\_\allowbreak
+  navier\_\allowbreak stokes\_\allowbreak mesh(...)}, the natural
+preconditioner DOF types will be the same as the elemental DOF types.
+We now continue with the implementation of the LSC preconditioner.
+
 
 \subsubsection{\texttt{setup(...)} for the LSC preconditioner\label{sec:lsc_implementation_setup}}
 We need to combine the velocity DOF types into one \emph{block type} and the
@@ -890,7 +708,7 @@ subsidiary preconditioner is called with a pointer to the original Jacobian
 $\mathbf{F}$ preconditioner is not a block preconditioner, then we do the same
 as we did in the simple block diagonal preconditioner case:
 \lstinputlisting[firstnumber=589,firstline=589, lastline=612]{./code/navier_stokes_preconditioners.cc}
-The \texttt{dof\_\allowbreak map} Vector is different from the
+The \texttt{dof\_\allowbreak map} \texttt{Vector} is different from the
 \texttt{dof\_\allowbreak to\_\allowbreak block\_\allowbreak map}
 \texttt{Vector}.  The \texttt{dof\_\allowbreak to\_\allowbreak
   block\_\allowbreak map} \texttt{Vector} describes the mapping of the
@@ -908,7 +726,7 @@ discussed later in this document.
 \subsubsection{\texttt{preconditioner\_solve(...)} for the LSC preconditioner\label{sec:lsc_implementation_precsolve}}
 The \texttt{preconditioner\_\allowbreak solve(...)} function for the LSC
 preconditioner follows the approach discussed in Section~\ref{sec:lsc_theory}.
-When block preconditioner are used as subsidiary preconditioners, we DO NOT
+When block preconditioner are used as subsidiary preconditioners, we \emph{do not}
 return the block vector, as this is handled by the subsidiary block
 preconditioner.
 \lstinputlisting[firstnumber=801,firstline=801, lastline=812]{./code/navier_stokes_preconditioners.cc}
@@ -1025,7 +843,184 @@ Detailed theoretical discussion for the Lagrangian preconditioner can be found i
 %%%% Implementation details
 \subsection{Implementation details\label{sec:lgr_implementation}}
 
-The Lagrangian preconditioner takes the `bulk' mesh as the first mesh (the mesh containing the TaylorHood elements). Subsequent meshes are surfaces meshes containing the \texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak Element} elements. We have established in Section \ref{sec:dof_types_and_block_types} that this leads to the natural DOF type ordering
+Again, we re-visit what we know about DOF types and meshes.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{Elemental DOF type classification}
+
+Each element classifies it's own DOF type in the function
+\texttt{get\_\allowbreak dof\_\allowbreak types\_\allowbreak for\_\allowbreak
+  unknowns(...)}. In the case of \texttt{Q\allowbreak TaylorHood\allowbreak
+  Element<2>} elements, the DOF types are classified as \texttt{0} and
+\texttt{1} for the $x$ and $y$-velocities, and \texttt{2} for the pressure $p$,
+as depicted in Figure \ref{fig:2DTH_DOF_classification_val}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{./pic/taylorhood_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
+  \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} elements. The square,
+  triangle and circle symbolises the DOF types within the element. Each element
+  classifies it's DOFs locally.}
+\label{fig:2DTH_DOF_classification_val}
+\end{figure}
+
+\subsubsection{The role of meshes}
+
+Within the block preconditioning framework, each mesh acts as a container for 
+a set of DOF type classifications. All elements in the same mesh \emph{must} 
+return the same \texttt{ndof\_\allowbreak types()} value. If two different 
+element types are in the same mesh, and their \texttt{ndof\_\allowbreak types()}
+does indeed return the same number, then their elemental DOF type 
+classifications will be treated as the same type. For example, recall in 
+Figure \ref{fig:2DTH_DOF_classification_val} that the elemental DOF types 
+classification for \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements are as follows:
+\begin{itemize}
+  \item \texttt{0} $x$-velocity
+  \item \texttt{1} $y$-velocity
+  \item \texttt{2} $p$-pressure
+\end{itemize}
+If we wish to constrain the flow along a boundary, we can attach the 
+\texttt{Face\allowbreak Element}s 
+\texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak Element<ELEMENT>} 
+along the appropriate boundary as shown in the demo problem: Steady 
+finite-Reynolds-number flow through an iliac bifurcation, these 
+\texttt{Face\allowbreak Element}s classifies the `bulk' velocity DOF types 
+as well as it's own DOF type as shown in Figure 
+\ref{fig:2DFACE_DOF_classification_val}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{./pic/faceelemenet_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
+  \texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak
+    Element<ELEMENT>} elements. The black DOFs represents those classified by
+  the TaylorHood element whilst the red DOFs are those which takes on the
+  \texttt{Face\allowbreak Element} classification. Notice that this
+  \texttt{Face\allowbreak Element} also (re-)classifies the velocity DOF types
+  on the side of the bulk element it is attached to.}
+\label{fig:2DFACE_DOF_classification_val}
+\end{figure}
+
+Although the \texttt{ndof\_\allowbreak types()} for these two different elements are the same,
+there are clearly six distinct DOF types. To ensure that the block 
+preconditioning framework treats these as different DOF types, we must have two
+meshes for the two different type of elements. If we put the two elements types
+in the same mesh, then the block preconditioning framework will not distinguish
+between the two \texttt{0} elemental DOF types, i.e. $x$-velocity is the same as 
+constrained $x$-velocity. The same applies to the remaining two elemental 
+DOF types \texttt{1} and \texttt{2}. Within the block preconditioning framework, 
+there is a built-in check to throw an error if a mesh passed to the framework 
+contains multiple types of elements. This check can be avoided by setting the 
+optional argument 
+\texttt{allow\_\allowbreak multiple\_\allowbreak element\_\allowbreak type\_\allowbreak in\_\allowbreak mesh} 
+when calling the function \texttt{set\_\allowbreak mesh(...)} to \texttt{true}. 
+In this case, the framework will check if the \texttt{ndof\_\allowbreak types()} 
+of all the elements of the same mesh are the same.
+
+\subsubsection{Preconditioner DOF types}
+The information contained in different meshes allow the BPF to order the elemental
+DOF types (note that the function \texttt{ndof\_\allowbreak types()} provides 
+the block offset). For example, consider the above problem, 
+the first mesh (the bulk mesh) contain elements with elemental DOF types 
+\texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-velocities and pressure
+respectively. The second mesh (the surface mesh) contain elements with elemental
+DOF types \texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-constrained 
+velocities and Lagrange multiplier respectively. Let $N$ be the 
+number of meshes, $N_i$ be the number of elemental DOF types in mesh $i$,
+$E_i = 0, \ldots N_i - 1$ be the elemental DOF types in mesh $i$, $B_{i,E_i}$ 
+be the corresponding preconditioner DOF types. Then the relationship 
+between the preconditioner DOF type $B_{i,E_i}$ and elemental DOF type
+$E_i$ is given by
+\begin{equation*}
+  B_{i,E_i} = E_i + \sum_{i=0}^{N - 1} N_i, \quad \mbox{for } E_i = 0,\ldots N_i.
+\end{equation*}
+Figure \ref{fig:elemental_to_block_dof_classification_val} shows the mapping between
+elemental DOF types and preconditioner DOF types for the example above.
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/elemental_to_block_dof_classification.pdf}
+\caption{Relationship between the classification of elemental DOF types and
+  preconditioner DOF types. Since the elemental DOF types are classified
+  locally per element type, the meshes provide an offset used to differentiate
+  the DOF types of different element types. DOFs can be classified more than
+  once, the classification of the DOF will be the type given to it by the last
+  element visited by the BPF which classified the DOF in question.}
+\label{fig:elemental_to_block_dof_classification_val}
+\end{figure}
+It is important to note that within the BPF, when multiple meshes are used, the
+ preconditioner DOF types admit to a two-level ordering: first by the mesh 
+they belong to, and then by the elemental DOF type within the mesh. To this end, 
+where the ordering of the preconditioner DOF types matters (such as the 
+LSC preconditioner), the block preconditioner should handle the ordering of the 
+meshes, the user should use functions such as 
+\texttt{set\_\allowbreak navier\_\allowbreak stokes\_\allowbreak mesh(...)}
+in the case of the 
+\texttt{Navier\allowbreak Stokes\allowbreak Schur\allowbreak Complement\allowbreak Preconditioner} 
+since the LSC preconditioner know where the Navier-Stokes mesh need to be in 
+the order of the meshes. We refer the ordering of the preconditioner DOF types, 
+determined by the elemental DOF type and the ordering of the meshes, the 
+\emph{natural ordering} of the preconditioner DOF types. For the above example, 
+the natural ordering of the preconditioner DOF
+types would be:
+\begin{itemize}
+ \item \texttt{0} $x$-velocity
+ \item \texttt{1} $y$-velocity
+ \item \texttt{2} $p$-pressure
+ \item \texttt{3} constrained $x$-velocity
+ \item \texttt{4} constrained $y$-velocity
+ \item \texttt{5} $L$-Lagrange multiplier
+\end{itemize}
+Note: Each DOF can be classified more than once. If this is the case, then the 
+classification will be the last mesh visited by the block preconditioning 
+framework. This should not be an issue if you do not have discontinuous 
+boundary conditions.
+
+\subsubsection{Block types}
+The block types are the blocks of sub-matrices the block preconditioner works 
+with. Block types may contain more than one preconditioner DOF types or be as 
+fine grain as the number of preconditioner DOF types. I.e. one or more 
+preconditioner DOF types can make one block type (this is desirable if the 
+physics of the underlying problem and the construction of the specific
+preconditioner for it benefit from such classification). For example, in case 
+of the LSC preconditioner (in 2D) we have three DOF types ($x$, $y$-velocities, 
+and pressure), but the preconditioner only distinguishes between velocity and 
+pressure DOF types, thus we have two block types (velocity block and pressure 
+block). There can not be more block types than there are preconditioner DOF
+types. 
+
+
+Converting the elemental DOF types into preconditioner DOF types and then into 
+block types is handled by the function \texttt{block\_\allowbreak setup(...)}.
+We discuss the usage of this function in more detail later. The relationship 
+between elemental DOF types, preconditioner DOF types and block types are 
+summarised in Figure \ref{fig:dof_block_type_relations_crop_val}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/dof_block_type_relations_crop.pdf}
+\caption{Relationship elemental DOF types, preconditioner DOF types and block
+  types. The arrow indicates the flow of dependency. The BPF requires the
+  correct ordering of the meshes and elemental DOF types, which gives rise to
+  the natural preconditioner DOF type ordering (this is the DOF type ordering
+  assumed by the preconditioner). The BPF then re-orders and combine the
+  relevant the DOF types to produce the required block types. With the block
+  types set up, we are able to use the blocks for preconditioning. In the above
+  example, block$(0,0)$ refers to the whole (combined) velocity block.}
+\label{fig:dof_block_type_relations_crop_val}
+\end{figure}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The Lagrangian preconditioner takes the `bulk' mesh as the first mesh (the mesh
+containing the TaylorHood elements). Subsequent meshes are surfaces meshes
+containing the \texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak
+  Element} elements. We have established in Section
+\ref{sec:dof_types_and_block_types} that this leads to the natural DOF type
+ordering
 \begin{center}
     \begin{tabular}{ | r | c c c c c c |}
     \hline
@@ -1043,8 +1038,7 @@ Lagrange multiplier DOF type.
  \subsubsection{\texttt{setup(...)} for the Lagrangian preconditioner\label{sec:lgr_setup}}
 First we need to create the \texttt{dof\_\allowbreak to\_\allowbreak
   block\_\allowbreak map} to create the block ordering as discussed in
-Section~\ref{sec:lgr_theory}. Recall from \ref{sec:dof_types_and_block_types}
-that to re-order block types, we ask ourselves `where do I want to move this
+Section~\ref{sec:lgr_theory}. We ask ourselves `where do I want to move this
 DOF type to?'. This leads to the following \texttt{dof\_\allowbreak
   to\_\allowbreak block\_\allowbreak map}:
 \begin{center}
@@ -1128,15 +1122,366 @@ so the \texttt{dof\_\allowbreak to\_\allowbreak dof\_\allowbreak map} says to
 the LSC preconditioner `treat DOF types 0 and 2 from the master preconditioner
 as DOF type 0, treat the DOF types 1 and 3 from the master preconditioner as
 DOF type 1, and treat DOF type 4 from the master preconditioner as DOF type 2'.
-Again, the implementation of the \texttt{Lagrange\allowbreak
-  Enforcedflow\allowbreak Preconditioner} is fully generalised, but will
-produce the above results.
+Figure \ref{fig:dof_to_dof_combined} depicts this process for the example above.
 
-In the below code, we fill the \texttt{f\_\allowbreak subblock\_\allowbreak pt} with the (modified) velocity blocks and the rest of the pressure block $B$ to form the blocks required for $\hat{\mathcal{F}}$:
-The code below describes how we create the \texttt{dof\_\allowbreak to\_\allowbreak dof\_\allowbreak map}:
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/dof_to_dof_combined.pdf}
+\caption{Coarsening preconditioner DOF types and using precomputed blocks for
+         preconditioning. The top row of matrices (from left to right) shows 
+         the preconditioner DOF types, then the block structure of the LSC
+         preconditioner, finally the block structure we want the Jacobian to be
+         partitioned into. The bottom row (from left to right) shows a more fine
+         grained block structure than the implementation of the LSC preconditioner
+         expects. Next we illustrate the coarsening of DOF types, after which
+         the process is the same as the top row.}
+\label{fig:dof_to_dof_combined}
+\end{figure}
+The implementation of the \texttt{Lagrange\allowbreak
+  Enforcedflow\allowbreak Preconditioner} is fully generalised to any number of meshes
+  and constraints.
+
+In the below code, we fill the \texttt{f\_\allowbreak subblock\_\allowbreak pt}
+with the (modified) velocity blocks and the rest of the pressure block $B$ to
+form the blocks required for $\hat{\mathcal{F}}$: The code below describes how
+we create the \texttt{dof\_\allowbreak to\_\allowbreak dof\_\allowbreak map}:
 \lstinputlisting[firstnumber=1747,firstline=1747, lastline=1767]{./code/lagrange_enforced_flow_preconditioner.h}
 Now, we set the precomputed blocks and call \texttt{setup(...)}:
 \lstinputlisting[firstnumber=1769,firstline=1769, lastline=1773]{./code/lagrange_enforced_flow_preconditioner.h}
+
+\subsubsection{Master and Subsidiary Preconditioners}
+For each generic problem we perform the Jacobian blocking according to the
+previously set rules and construct a preconditioner for that problem. This
+preconditioner is often referred to as the master preconditioner. Within this
+preconditioner one needs to invert approximately some of the diagonal blocks or
+the associated Schur compliments. This can be achieved by applying in a
+systematic hierarchical manner with suitable preconditioners, referred to as
+the subsidiary preconditioners. Each of subsidiary preconditioners, in turn,
+can be implemented by introducing further subsidiary preconditioners. Such
+decomposition of a master preconditioner leads to a tree-like structure (with a
+master preconditioner in the root and the leaf nodes typically corresponding to
+the scalar sub-problems solved by AMG). The BPF handles this recursive
+tree-like definition of any generic preconditioner.
+
+Consider again the LSC Navier-Stokes preconditioner. If we decide to approximate
+the $\mathbf{F}$ block (the momentum block) by it's diagonal blocks, we can 
+pass the block diagonal preconditioner (discussed in (Distributed) 
+General-Purpose Block Preconditioners) to the LSC preconditioner to use as a 
+subsidiary preconditioner via the function 
+\texttt{set\_\allowbreak f\_\allowbreak preconditioner(...)}. We can do the 
+same with the pressure system with the function 
+\texttt{set\_\allowbreak p\_\allowbreak preconditioner(...)}. In this context, 
+we refer to these preconditioners as subsidiary preconditioners. 
+\texttt{Oomph-lib}'s block preconditioning framework facilitates the reuse of 
+existing preconditioners as subsidiary preconditioners.
+
+It is important to note that we do not need to consider the block structure of
+subsidiary block preconditioners when developing master preconditioners.
+However, the master preconditioner must be aware of the preconditioner DOF type
+ordering assumed by subsidiary preconditioner. For example, if the LSC
+preconditioner is a subsidiary preconditioner (as is the case of the Augmented
+Lagrangian preconditioner preconditioner), the Augmented Lagrangian
+preconditioner must ensure that the last preconditioner DOF type given to the
+LSC preconditioner is the pressure DOF type, and the preconditioner DOF types
+before that are the velocity DOF types.
+
+For each problem, only one master preconditioner is defined and the remaining
+preconditioners in the hierarchy are all considered to be subsidiary
+preconditioners. Each subsidiary preconditioner holds a pointer to the
+preconditioner one level higher in the hierarchy. Figure
+\ref{fig:bpf_hierarchy_tree_crop_val} illustrates an example of a hierarchical tree
+generated as a result of multiple levels of subsidiary preconditioning. Figure
+\ref{fig:bpf_hierarchy_matrixstructure_crop_val} shows the structure of the
+matrices and preconditioners for the same hierarchical tree as Figure
+\ref{fig:bpf_hierarchy_tree_crop_val}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{./pic/bpf_hierarchy_tree_crop.pdf}
+\caption{An example of a hierarchical tree resulting from multiple levels of
+  subsidiary preconditioning. The master preconditioner is the Augmented
+  Lagrangian preconditioner. When applying the master preconditioner, we can
+  use existing preconditioners for the subsidiary systems, this process is
+  depicted in Figure \ref{fig:bpf_hierarchy_matrixstructure_crop_val}.}
+\label{fig:bpf_hierarchy_tree_crop_val}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/bpf_hierarchy_matrixstructure_crop.pdf}
+\caption{The structures of the matrices and corresponding preconditioners for
+  the hierarchical tree structure presented in Figure
+  \ref{fig:bpf_hierarchy_tree_crop_val}. The top left is the Jacobian resulting
+  from Newton's method, to the right we have the corresponding Augmented
+  Lagrangian preconditioner (see the matrices on the first row). The Augmented
+  Lagrangian preconditioner requires the solution of two subsidiary systems, in
+  particular, a modified Navier-Stokes subsystem. We can further approximate
+  this subsystem with the Navier-Stokes LSC precondition (see the matrices on
+  the second row). Applying Navier-Stokes LSC preconditioner requires the
+  solution of the modified momentum block, which we can approximate with an
+  upper block triangular preconditioner (see the third row).}
+\label{fig:bpf_hierarchy_matrixstructure_crop_val}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Review of DOF types, block types, meshes and subsidiary preconditioners}
+
+
+%%%% DOF TYPES AND BLOCK TYPES
+\subsection{DOF types and block types\label{sec:dof_types_and_block_types}}
+In the block diagonal preconditioner for the two-dimensional linear elasticity 
+problem, there are two DOF types, there are also two block types. However, in 
+more complicated preconditioners, such as the LSC preconditioner, there are 
+more DOF types than there are block types. To see this, consider  using the 
+LSC preconditioner on a 2D problem, we have two velocity DOF types, $x$ and 
+$y$-velocities, and one pressure DOF type, $p$. But the LSC preconditioner 
+works with velocity and pressure block types, the two velocity DOF types are 
+combined to form one block type. Below we describe relationship between 
+elemental DOF type classification, meshes, the preconditioner DOF types, 
+and block types:
+
+\subsubsection{Elemental DOF type classification}
+
+Each element classifies it's own DOF type in the function 
+\texttt{get\_\allowbreak dof\_\allowbreak types\_\allowbreak for\_\allowbreak unknowns(...)}. In the case of 
+\texttt{My\allowbreak Linear\allowbreak Elasticity\allowbreak Element<2>} elements, the DOF types are classified as 
+\texttt{0} and \texttt{1}. For \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements, the DOF types are classified as \texttt{0} and \texttt{1} for the $x$
+and $y$-velocities, and \texttt{2} for the pressure $p$, as depicted in Figure \ref{fig:2DTH_DOF_classification}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{./pic/taylorhood_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
+  \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} elements. The square,
+  triangle and circle symbolises the DOF types within the element. Each element
+  classifies it's DOFs locally.}
+\label{fig:2DTH_DOF_classification}
+\end{figure}
+
+\subsubsection{The role of meshes}
+
+Within the block preconditioning framework, each mesh acts as a container for 
+a set of DOF type classifications. All elements in the same mesh \emph{must} 
+return the same \texttt{ndof\_\allowbreak types()} value. If two different 
+element types are in the same mesh, and their \texttt{ndof\_\allowbreak types()}
+does indeed return the same number, then their elemental DOF type 
+classifications will be treated as the same type. For example, recall in 
+Figure \ref{fig:2DTH_DOF_classification} that the elemental DOF types 
+classification for \texttt{Q\allowbreak TaylorHood\allowbreak Element<2>} 
+elements are as follows:
+\begin{itemize}
+  \item \texttt{0} $x$-velocity
+  \item \texttt{1} $y$-velocity
+  \item \texttt{2} $p$-pressure
+\end{itemize}
+If we wish to constrain the flow along a boundary, we can attach the 
+\texttt{Face\allowbreak Element}s 
+\texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak Element<ELEMENT>} 
+along the appropriate boundary as shown in the demo problem: Steady 
+finite-Reynolds-number flow through an iliac bifurcation, these 
+\texttt{Face\allowbreak Element}s classifies the `bulk' velocity DOF types 
+as well as it's own DOF type as shown in Figure 
+\ref{fig:2DFACE_DOF_classification}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{./pic/faceelemenet_dof_classification.pdf}
+\caption{Elemental DOF type classification for \texttt{oomph-\allowbreak lib}'s
+  \texttt{Impose\allowbreak Parallel\allowbreak Outflow\allowbreak
+    Element<ELEMENT>} elements. The black DOFs represents those classified by
+  the TaylorHood element whilst the red DOFs are those which takes on the
+  \texttt{Face\allowbreak Element} classification. Notice that this
+  \texttt{Face\allowbreak Element} also (re-)classifies the velocity DOF types
+  on the side of the bulk element it is attached to.}
+\label{fig:2DFACE_DOF_classification}
+\end{figure}
+
+Although the \texttt{ndof\_\allowbreak types()} for these two different elements are the same,
+there are clearly six distinct DOF types. To ensure that the block 
+preconditioning framework treats these as different DOF types, we must have two
+meshes for the two different type of elements. If we put the two elements types
+in the same mesh, then the block preconditioning framework will not distinguish
+between the two \texttt{0} elemental DOF types, i.e. $x$-velocity is the same as 
+constrained $x$-velocity. The same applies to the remaining two elemental 
+DOF types \texttt{1} and \texttt{2}. Within the block preconditioning framework, 
+there is a built-in check to throw an error if a mesh passed to the framework 
+contains multiple types of elements. This check can be avoided by setting the 
+optional argument 
+\texttt{allow\_\allowbreak multiple\_\allowbreak element\_\allowbreak type\_\allowbreak in\_\allowbreak mesh} 
+when calling the function \texttt{set\_\allowbreak mesh(...)} to \texttt{true}. 
+In this case, the framework will check if the \texttt{ndof\_\allowbreak types()} 
+of all the elements of the same mesh are the same.
+
+\subsubsection{Preconditioner DOF types}
+The information contained in different meshes allow the BPF to order the elemental
+DOF types (note that the function \texttt{ndof\_\allowbreak types()} provides 
+the block offset). For example, consider the above \texttt{vmtk} RAYFIX problem, 
+the first mesh (the bulk mesh) contain elements with elemental DOF types 
+\texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-velocities and pressure
+respectively. The second mesh (the surface mesh) contain elements with elemental
+DOF types \texttt{0}, \texttt{1} and \texttt{2} for the $x$, $y$-constrained 
+velocities and Lagrange multiplier respectively. Let $N$ be the 
+number of meshes, $N_i$ be the number of elemental DOF types in mesh $i$,
+$E_i = 0, \ldots N_i - 1$ be the elemental DOF types in mesh $i$, $B_{i,E_i}$ 
+be the corresponding preconditioner DOF types. Then the relationship 
+between the preconditioner DOF type $B_{i,E_i}$ and elemental DOF type
+$E_i$ is given by
+\begin{equation*}
+  B_{i,E_i} = E_i + \sum_{i=0}^{N - 1} N_i, \quad \mbox{for } E_i = 0,\ldots N_i.
+\end{equation*}
+Figure \ref{fig:elemental_to_block_dof_classification} shows the mapping between
+elemental DOF types and preconditioner DOF types for the example above.
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/elemental_to_block_dof_classification.pdf}
+\caption{Relationship between the classification of elemental DOF types and
+  preconditioner DOF types. Since the elemental DOF types are classified
+  locally per element type, the meshes provide an offset used to differentiate
+  the DOF types of different element types. DOFs can be classified more than
+  once, the classification of the DOF will be the type given to it by the last
+  element visited by the BPF which classified the DOF in question.}
+\label{fig:elemental_to_block_dof_classification}
+\end{figure}
+It is important to note that within the BPF, when multiple meshes are used, the
+preconditioner DOF types admit to a two-level ordering: first by the mesh 
+they belong to, and then by the elemental DOF type within the mesh. To this end, 
+where the ordering of the preconditioner DOF types matters (such as the 
+LSC preconditioner), the block preconditioner should handle the ordering of the 
+meshes, the user should use functions such as 
+\texttt{set\_\allowbreak navier\_\allowbreak stokes\_\allowbreak mesh(...)}
+in the case of the 
+\texttt{Navier\allowbreak Stokes\allowbreak Schur\allowbreak Complement\allowbreak Preconditioner} 
+since the LSC preconditioner know where the Navier-Stokes mesh need to be in 
+the order of the meshes. We refer the ordering of the preconditioner DOF types, 
+determined by the elemental DOF type and the ordering of the meshes, the 
+\emph{natural ordering} of the preconditioner DOF types. For the above example, 
+the natural ordering of the preconditioner DOF
+types would be:
+\begin{itemize}
+ \item \texttt{0} $x$-velocity
+ \item \texttt{1} $y$-velocity
+ \item \texttt{2} $p$-pressure
+ \item \texttt{3} constrained $x$-velocity
+ \item \texttt{4} constrained $y$-velocity
+ \item \texttt{5} $L$-Lagrange multiplier
+\end{itemize}
+Note: Each DOF can be classified more than once. If this is the case, then the 
+classification will be the last mesh visited by the block preconditioning 
+framework. This should not be an issue if you do not have discontinuous 
+boundary conditions.
+
+\subsubsection{Block types}
+The block types are the blocks of sub-matrices the block preconditioner works 
+with. Block types may contain more than one preconditioner DOF types or be as 
+fine grain as the number of preconditioner DOF types. I.e. one or more 
+preconditioner DOF types can make one block type (this is desirable if the 
+physics of the underlying problem and the construction of the specific
+preconditioner for it benefit from such classification). For example, in case 
+of the LSC preconditioner (in 2D) we have three DOF types ($x$, $y$-velocities, 
+and pressure), but the preconditioner only distinguishes between velocity and 
+pressure DOF types, thus we have two block types (velocity block and pressure 
+block). There can not be more block types than there are preconditioner DOF
+types. 
+
+
+Converting the elemental DOF types into preconditioner DOF types and then into 
+block types is handled by the function \texttt{block\_\allowbreak setup(...)}.
+We discuss the usage of this function in more detail later. The relationship 
+between elemental DOF types, preconditioner DOF types and block types are 
+summarised in Figure \ref{fig:dof_block_type_relations_crop}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/dof_block_type_relations_crop.pdf}
+\caption{Relationship elemental DOF types, preconditioner DOF types and block
+  types. The arrow indicates the flow of dependency. The BPF requires the
+  correct ordering of the meshes and elemental DOF types, which gives rise to
+  the natural preconditioner DOF type ordering (this is the DOF type ordering
+  assumed by the preconditioner). The BPF then re-orders and combine the
+  relevant the DOF types to produce the required block types. With the block
+  types set up, we are able to use the blocks for preconditioning. In the above
+  example, block$(0,0)$ refers to the whole (combined) velocity block.}
+\label{fig:dof_block_type_relations_crop}
+\end{figure}
+
+
+%%% MASTER AND SUBSIDIARY PRECONDITIONER
+\subsection{Master and Subsidiary Preconditioners\label{sec:master_and_subsidiary_preconditioners}}
+For each generic problem we perform the Jacobian blocking according to the
+previously set rules and construct a preconditioner for that problem.  This
+preconditioner is often referred to as the master preconditioner. Within this
+preconditioner one needs to invert approximately some of the diagonal blocks or
+the associated Schur compliments. This can be achieved by applying in a
+systematic hierarchical manner with suitable preconditioners, referred to as
+the subsidiary preconditioners. Each of subsidiary preconditioners, in turn,
+can be implemented by introducing further subsidiary preconditioners. Such
+decomposition of a master preconditioner leads to a tree-like structure (with a
+master preconditioner in the root and the leaf nodes typically corresponding to
+the scalar sub-problems solved by AMG). The BPF handles this recursive
+tree-like definition of any generic preconditioner.
+
+Consider again the LSC Navier-Stokes preconditioner. If we decide to approximate
+the $\mathbf{F}$ block (the momentum block) by it's diagonal blocks, we can 
+pass the block diagonal preconditioner (discussed in (Distributed) 
+General-Purpose Block Preconditioners) to the LSC preconditioner to use as a 
+subsidiary preconditioner via the function 
+\texttt{set\_\allowbreak f\_\allowbreak preconditioner(...)}. We can do the 
+same with the pressure system with the function 
+\texttt{set\_\allowbreak p\_\allowbreak preconditioner(...)}. In this context, 
+we refer to these preconditioners as subsidiary preconditioners. 
+\texttt{Oomph-lib}'s block preconditioning framework facilitates the reuse of 
+existing preconditioners as subsidiary preconditioners.
+
+It is important to note that we do not need to consider the block structure of
+subsidiary block preconditioners when developing master preconditioners.
+However, the master preconditioner must be aware of the preconditioner DOF type
+ordering assumed by subsidiary preconditioner. For example, if the LSC
+preconditioner is a subsidiary preconditioner (as is the case of the Augmented
+Lagrangian preconditioner preconditioner), the Augmented Lagrangian
+preconditioner must ensure that the last preconditioner DOF type given to the
+LSC preconditioner is the pressure DOF type, and the preconditioner DOF types
+before that are the velocity DOF types.
+
+For each problem, only one master preconditioner is defined and the remaining
+preconditioners in the hierarchy are all considered to be subsidiary
+preconditioners. Each subsidiary preconditioner holds a pointer to the
+preconditioner one level higher in the hierarchy. Figure
+\ref{fig:bpf_hierarchy_tree_crop} illustrates an example of a hierarchical tree
+generated as a result of multiple levels of subsidiary preconditioning. Figure
+\ref{fig:bpf_hierarchy_matrixstructure_crop} shows the structure of the
+matrices and preconditioners for the same hierarchical tree as Figure
+\ref{fig:bpf_hierarchy_tree_crop}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{./pic/bpf_hierarchy_tree_crop.pdf}
+\caption{An example of a hierarchical tree resulting from multiple levels of
+  subsidiary preconditioning. The master preconditioner is the Augmented
+  Lagrangian preconditioner. When applying the master preconditioner, we can
+  use existing preconditioners for the subsidiary systems, this process is
+  depicted in Figure \ref{fig:bpf_hierarchy_matrixstructure_crop}.}
+\label{fig:bpf_hierarchy_tree_crop}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\textwidth]{./pic/bpf_hierarchy_matrixstructure_crop.pdf}
+\caption{The structures of the matrices and corresponding preconditioners for
+  the hierarchical tree structure presented in Figure
+  \ref{fig:bpf_hierarchy_tree_crop}. The top left is the Jacobian resulting
+  from Newton's method, to the right we have the corresponding Augmented
+  Lagrangian preconditioner (see the matrices on the first row). The Augmented
+  Lagrangian preconditioner requires the solution of two subsidiary systems, in
+  particular, a modified Navier-Stokes subsystem. We can further approximate
+  this subsystem with the Navier-Stokes LSC precondition (see the matrices on
+  the second row). Applying Navier-Stokes LSC preconditioner requires the
+  solution of the modified momentum block, which we can approximate with an
+  upper block triangular preconditioner (see the third row).}
+\label{fig:bpf_hierarchy_matrixstructure_crop}
+\end{figure}
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Source files
